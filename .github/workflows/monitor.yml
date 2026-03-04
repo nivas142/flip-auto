@@ -45,6 +45,7 @@ jobs:
           python - <<'PY'
           import json
           import os
+          import re
           import yaml
           from pathlib import Path
 
@@ -73,15 +74,21 @@ jobs:
 
           gsheet_cfg = cfg.setdefault("gsheet", {})
           gsheet_cfg["public_url"] = gsheet_public_url
-          if gsheet_spreadsheet_id:
-              gsheet_cfg["spreadsheet_id"] = gsheet_spreadsheet_id
 
           if not gsheet_public_url and not gsheet_service_account_json:
               raise SystemExit(
                   "Set either GSHEET_PUBLIC_URL or GSHEET_SERVICE_ACCOUNT_JSON for sheet access."
               )
 
-          if gsheet_service_account_json:
+          # Prefer public-sheet mode when public URL is available.
+          if gsheet_public_url:
+              if not gsheet_spreadsheet_id:
+                  match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", gsheet_public_url)
+                  if match:
+                      gsheet_spreadsheet_id = match.group(1)
+              if gsheet_spreadsheet_id:
+                  gsheet_cfg["spreadsheet_id"] = gsheet_spreadsheet_id
+          elif gsheet_service_account_json:
               if not gsheet_spreadsheet_id:
                   raise SystemExit(
                       "GSHEET_SPREADSHEET_ID is required when GSHEET_SERVICE_ACCOUNT_JSON is set."
@@ -92,8 +99,8 @@ jobs:
               parsed = json.loads(gsheet_service_account_json)
               creds_path.write_text(json.dumps(parsed), encoding="utf-8")
               gsheet_cfg["credentials_json"] = str(creds_path)
-              # Force service-account path when private key is provided.
               gsheet_cfg["public_url"] = ""
+              gsheet_cfg["spreadsheet_id"] = gsheet_spreadsheet_id
 
           Path("config.yaml").write_text(
               yaml.safe_dump(cfg, sort_keys=False),

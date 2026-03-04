@@ -439,29 +439,54 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     cities = sheet_cfg.get("cities", [])
     source_key = ""
 
-    public_data = load_public_sheet_rows(sheet_cfg)
+    public_data: tuple[list[dict[str, Any]], str] | None = None
+    try:
+        public_data = load_public_sheet_rows(sheet_cfg)
+    except Exception as exc:
+        print(
+            f"[WARN] Google Sheet public fetch failed ({exc.__class__.__name__}: {exc}). "
+            "Will try service-account access if configured.",
+            file=sys.stderr,
+        )
+
     if public_data is not None:
         rows, source_key = public_data
     else:
-        import gspread
-        from google.oauth2.service_account import Credentials
-
-        credentials_file = sheet_cfg["credentials_json"]
-        spreadsheet_id = sheet_cfg["spreadsheet_id"]
+        credentials_file = normalize_text(str(sheet_cfg.get("credentials_json", "")))
+        spreadsheet_id = normalize_text(str(sheet_cfg.get("spreadsheet_id", "")))
         worksheet_name = sheet_cfg.get("worksheet", "Sheet1")
 
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets.readonly",
-            "https://www.googleapis.com/auth/drive.readonly",
-        ]
+        if not credentials_file or not spreadsheet_id:
+            print(
+                "[WARN] Google Sheet not accessible: no public URL and missing "
+                "service-account settings. Continuing without sheet matches.",
+                file=sys.stderr,
+            )
+            return []
 
-        creds = Credentials.from_service_account_file(credentials_file, scopes=scopes)
-        gc = gspread.authorize(creds)
+        try:
+            import gspread
+            from google.oauth2.service_account import Credentials
 
-        sh = gc.open_by_key(spreadsheet_id)
-        ws = sh.worksheet(worksheet_name)
-        rows = ws.get_all_records()
-        source_key = f"{spreadsheet_id}:{worksheet_name}"
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/drive.readonly",
+            ]
+
+            creds = Credentials.from_service_account_file(credentials_file, scopes=scopes)
+            gc = gspread.authorize(creds)
+
+            sh = gc.open_by_key(spreadsheet_id)
+            ws = sh.worksheet(worksheet_name)
+            rows = ws.get_all_records()
+            source_key = f"{spreadsheet_id}:{worksheet_name}"
+        except Exception as exc:
+            print(
+                f"[WARN] Google Sheet service-account access failed "
+                f"({exc.__class__.__name__}: {exc}). Continuing without sheet matches.",
+                file=sys.stderr,
+            )
+            return []
 
     results: list[AlertItem] = []
 
