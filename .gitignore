@@ -1,0 +1,14 @@
+# Local runtime config with secrets
+config.yaml
+
+# Local/private credentials
+creds/*.json
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/

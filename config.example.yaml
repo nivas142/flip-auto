@@ -1,0 +1,51 @@
+# Copy this to config.yaml and fill in your values.
+
+state_file: state/monitor_state.json
+
+email:
+  enabled: true
+  imap_host: imap.gmail.com
+  username: REPLACE_WITH_EMAIL_USERNAME
+  password: REPLACE_WITH_EMAIL_APP_PASSWORD
+  folder: INBOX
+  lookback_minutes: 120
+  sender_filters:
+    - deals@exohomesolutions.com
+    - everett.williams-first48offers.com@shared1.ccsend.com
+    - jeremiah@networthaz.com
+  cities:
+    - Chandler
+    - Gilbert
+    - Queen Creek
+
+gsheet:
+  enabled: true
+  public_url: https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit?gid=0#gid=0
+  public_gid: 0
+  credentials_json: creds/google-service-account.json
+  spreadsheet_id: REPLACE_WITH_SHEET_ID
+  worksheet: Sheet1
+  city_column: city
+  row_id_column: id
+  content_columns:
+    - address
+    - price
+    - notes
+    - link
+  cities:
+    - Phoenix
+    - Mesa
+    - Tempe
+
+telegram:
+  enabled: true
+  bot_token: REPLACE_WITH_TELEGRAM_BOT_TOKEN
+  chat_id: REPLACE_WITH_TELEGRAM_CHAT_ID
+
+twilio:
+  enabled: false
+  account_sid: REPLACE_WITH_TWILIO_ACCOUNT_SID
+  auth_token: REPLACE_WITH_TWILIO_AUTH_TOKEN
+  messaging_service_sid: REPLACE_WITH_TWILIO_MESSAGING_SERVICE_SID
+  from_number: "+1REPLACE_WITH_TWILIO_NUMBER"
+  to_number: "+1REPLACE_WITH_DESTINATION_NUMBER"

@@ -1,0 +1,124 @@
+name: Flip Auto Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every 30 min from 8:00 AM to 5:30 PM America/Phoenix (UTC-7)
+    - cron: "*/30 15-23,0 * * *"
+    # 6:00 PM America/Phoenix
+    - cron: "0 1 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flip-auto-monitor
+  cancel-in-progress: false
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build config from template + GitHub Secrets
+        env:
+          EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GSHEET_PUBLIC_URL: ${{ secrets.GSHEET_PUBLIC_URL }}
+          GSHEET_SPREADSHEET_ID: ${{ secrets.GSHEET_SPREADSHEET_ID }}
+          GSHEET_SERVICE_ACCOUNT_JSON: ${{ secrets.GSHEET_SERVICE_ACCOUNT_JSON }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import yaml
+          from pathlib import Path
+
+          required = [
+              "EMAIL_USERNAME",
+              "EMAIL_APP_PASSWORD",
+              "TELEGRAM_BOT_TOKEN",
+              "TELEGRAM_CHAT_ID",
+          ]
+          missing = [name for name in required if not os.getenv(name, "").strip()]
+          if missing:
+              raise SystemExit(f"Missing required GitHub secrets: {', '.join(missing)}")
+
+          template_path = Path("config.example.yaml")
+          cfg = yaml.safe_load(template_path.read_text(encoding="utf-8")) or {}
+
+          cfg.setdefault("email", {})["username"] = os.environ["EMAIL_USERNAME"]
+          cfg.setdefault("email", {})["password"] = os.environ["EMAIL_APP_PASSWORD"]
+          cfg.setdefault("email", {})["lookback_minutes"] = 120
+          cfg.setdefault("telegram", {})["bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
+          cfg.setdefault("telegram", {})["chat_id"] = os.environ["TELEGRAM_CHAT_ID"]
+
+          gsheet_public_url = os.getenv("GSHEET_PUBLIC_URL", "").strip()
+          gsheet_spreadsheet_id = os.getenv("GSHEET_SPREADSHEET_ID", "").strip()
+          gsheet_service_account_json = os.getenv("GSHEET_SERVICE_ACCOUNT_JSON", "").strip()
+
+          gsheet_cfg = cfg.setdefault("gsheet", {})
+          gsheet_cfg["public_url"] = gsheet_public_url
+          if gsheet_spreadsheet_id:
+              gsheet_cfg["spreadsheet_id"] = gsheet_spreadsheet_id
+
+          if not gsheet_public_url and not gsheet_service_account_json:
+              raise SystemExit(
+                  "Set either GSHEET_PUBLIC_URL or GSHEET_SERVICE_ACCOUNT_JSON for sheet access."
+              )
+
+          if gsheet_service_account_json:
+              if not gsheet_spreadsheet_id:
+                  raise SystemExit(
+                      "GSHEET_SPREADSHEET_ID is required when GSHEET_SERVICE_ACCOUNT_JSON is set."
+                  )
+              creds_dir = Path("creds")
+              creds_dir.mkdir(parents=True, exist_ok=True)
+              creds_path = creds_dir / "google-service-account.json"
+              parsed = json.loads(gsheet_service_account_json)
+              creds_path.write_text(json.dumps(parsed), encoding="utf-8")
+              gsheet_cfg["credentials_json"] = str(creds_path)
+              # Force service-account path when private key is provided.
+              gsheet_cfg["public_url"] = ""
+
+          Path("config.yaml").write_text(
+              yaml.safe_dump(cfg, sort_keys=False),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Run monitor
+        run: python monitor.py
+
+      - name: Commit updated state file
+        shell: bash
+        run: |
+          if [ ! -f state/monitor_state.json ]; then
+            echo "No state file to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/monitor_state.json
+
+          if git diff --cached --quiet; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git commit -m "chore: update monitor state [skip ci]"
+          git push

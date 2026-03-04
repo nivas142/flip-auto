@@ -1,0 +1,2277 @@
+Delivered-To: nivas.966@gmail.com
+Received: by 2002:a05:612c:419d:b0:569:22d4:40ca with SMTP id le29csp2021477vqb;
+        Mon, 2 Mar 2026 13:38:42 -0800 (PST)
+X-Received: by 2002:a05:622a:1181:b0:501:4858:a6d0 with SMTP id d75a77b69052e-507529db89dmr192068871cf.56.1772487521846;
+        Mon, 02 Mar 2026 13:38:41 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1772487521; cv=none;
+        d=google.com; s=arc-20240605;
+        b=OpNN/Irlmh2PMAGOimK0gVQChOhLpnI3g/CkoepNO5NHkwR6UvStQqx5DLnsANCZyL
+         jAIJXFF5vfH0k5y5E9c3iShBF9L+zH/tDqoZZi6t9sSdxll5qGRLaUHzNQL5R/Iwn3Qa
+         OfX+OACghR4ykJgFTwiZlqqui55JDZR9IPn0u7QFI8/aidBKD9yTemMpezsameO6VGMS
+         D/jiYKJ0YYotrIkNlp8d0u8bMPJ0Bd+qmvNzx0DDY/RncGihdmyeUjRFVHMnjzvWouY2
+         lkqtX0LlJ+rJQ2kRl79KPM3tx4OOMXRkNgImmeANLGkGSyWcYNAAf/grJP0tm9oJ7L9L
+         z94g==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=list-unsubscribe-post:list-unsubscribe:mime-version:subject:to
+         :reply-to:from:date:message-id:dkim-signature:dkim-signature;
+        bh=gPj8iHeWtKIZAA6du7r/gDew1b7FzxzoiXZooT2y9cg=;
+        fh=bxhFOS1lNnovaXYjug36vNzZlEtshpieTYmwaxzwFrQ=;
+        b=XKIgz+I909yPxSD+8OKQjp19H0BbiYHvstg9l9w6vHh585EFyXg3l0lBsz/9GsCDdc
+         VXyJP7I1rG1+8P7Io9ZV8upE8SFV+3+xzpyJYSQEF84tV+p96LrPHbneRgMlOJOzv5VE
+         Bi1XdCvEXPrsycCzkSpr6dJGOujKFsDXAPuZK5SLU6jhzDeJpzvo20LmbzjRMHSCS+9u
+         OG9Gv8ft8s5E4Ni4Q4Z7KbEifb4x/PviU384cji+Xh8TwmFR8SlD5gsCtcROs5wVvccY
+         UjFngXYZ6nKm8/fScVR2XQN6WwrEZ+BMjqyPNcclRkMrQEJzPtYJM8VnlfumxrFVQibl
+         l4NA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@shared1.ccsend.com header.s=12042023 header.b=OxhgaAED;
+       dkim=pass header.i=@auth.ccsend.com header.s=1000073432 header.b=DyethH54;
+       spf=pass (google.com: domain of a01+ki2mltmgepxc62hdmfg==_1142292127529_8b4fuuamefca/wjcwhjxeg==@in.constantcontact.com designates 208.75.123.200 as permitted sender) smtp.mailfrom="A01+Ki2MlTMGEPxc62HdmFg==_1142292127529_8B4fuuAmEfCa/wJCWhJXEg==@in.constantcontact.com";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=ccsend.com
+Return-Path: <A01+Ki2MlTMGEPxc62HdmFg==_1142292127529_8B4fuuAmEfCa/wJCWhJXEg==@in.constantcontact.com>
+Received: from ccm200.constantcontact.com (ccm200.constantcontact.com. [208.75.123.200])
+        by mx.google.com with ESMTPS id d75a77b69052e-50744aea026si168751581cf.275.2026.03.02.13.38.41
+        for <nivas.966@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Mon, 02 Mar 2026 13:38:41 -0800 (PST)
+Received-SPF: pass (google.com: domain of a01+ki2mltmgepxc62hdmfg==_1142292127529_8b4fuuamefca/wjcwhjxeg==@in.constantcontact.com designates 208.75.123.200 as permitted sender) client-ip=208.75.123.200;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@shared1.ccsend.com header.s=12042023 header.b=OxhgaAED;
+       dkim=pass header.i=@auth.ccsend.com header.s=1000073432 header.b=DyethH54;
+       spf=pass (google.com: domain of a01+ki2mltmgepxc62hdmfg==_1142292127529_8b4fuuamefca/wjcwhjxeg==@in.constantcontact.com designates 208.75.123.200 as permitted sender) smtp.mailfrom="A01+Ki2MlTMGEPxc62HdmFg==_1142292127529_8B4fuuAmEfCa/wJCWhJXEg==@in.constantcontact.com";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=ccsend.com
+DKIM-Signature: v=1; q=dns/txt; a=rsa-sha256; c=relaxed/relaxed; s=12042023; d=shared1.ccsend.com; h=date:mime-version:subject:X-Feedback-ID:X-250ok-CID:message-id:from:reply-to:list-unsubscribe:list-unsubscribe-post:to; bh=gPj8iHeWtKIZAA6du7r/gDew1b7FzxzoiXZooT2y9cg=; b=OxhgaAEDuOcIc1y80N94+g0OAn3EF0SdWEJuvTc716O2VdBrd2SXyi/7jHsBZGELkvOpzw0Hpu1L5BozIFXLLKEda7qYO+QIdb3Iqgnd8EfKLtZSSfFkm7JA3p1r6Jju/v5aNro9rWruoJwJyArUKrIXeHL7CHHxHaVbSGStFuJugyisKHHupldHKqCRl8yy2Ol/MVF8rxkLX0hGcaRom91s1OenP0oTWLPG3Hx5A6D9VpE58LSrwEDHDUqAdv5Ol4+0cVaTPPtUXVcwX53IE5zXlu3U6aEv20vrGzfJBHZix2RDbI1L2OxKwC77kRJ7WKYgtZQ215TM+4TqEJWKIw==
+DKIM-Signature: v=1; q=dns/txt; a=rsa-sha256; c=relaxed/relaxed; s=1000073432; d=auth.ccsend.com; h=date:mime-version:subject:X-Feedback-ID:X-250ok-CID:message-id:from:reply-to:list-unsubscribe:list-unsubscribe-post:to; bh=gPj8iHeWtKIZAA6du7r/gDew1b7FzxzoiXZooT2y9cg=; b=DyethH54kBCVtslLnpyO8kEvNBvRruyVnpTX1kZyL7fDtbaTdmftrAg9V04iTfhhtqUI6YxlLvARS9mT22YHsnTsmkGZPRQO/cuvTZpX0fsq61/9qxjvtjm9MiQi1KevaOCBCdgR3//QvUXEnH5jgOLJN0xPQam3h6sCVm02CCY=
+Message-ID: <1142303825511.1142292127529.1568868847.0.951638JL.2002@synd.ccsend.com>
+Date: Mon, 2 Mar 2026 16:38:41 -0500 (EST)
+From: Flip Flow <everett.williams-first48offers.com@shared1.ccsend.com>
+Reply-To: everett.williams@first48offers.com
+To: nivas.966@gmail.com
+Subject: =?utf-8?Q?=F0=9F=94=A5_43_Off-Market_AZ_Deals_=E2=80=94_Phoenix_?=
+ =?utf-8?Q?=E2=80=A2_Scottsdale_=E2=80=A2_Mesa_=E2=80=A2_Glendale_+_More?=
+MIME-Version: 1.0
+Content-Type: multipart/alternative; 
+	boundary="----=_Part_471444577_1098660608.1772487521690"
+List-Unsubscribe: <https://visitor.constantcontact.com/do?p=un&m=001N3lxtzeJBSZkaGUufRgKxw%3D%3D&se=001cNIQbWYOeQfQUWeNTkTdkQ%3D%3D&t=001EkZLEx15CcE%3D&llr=jzhv59hbb>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+X-Campaign-Activity-ID: d35f8a8b-6325-4cc1-843f-173ad8776616
+X-250ok-CID: d35f8a8b-6325-4cc1-843f-173ad8776616
+X-Channel-ID: f01e1fba-e026-11f0-9aff-02425a125712
+X-Return-Path-Hint: A01+Ki2MlTMGEPxc62HdmFg==_1142292127529_8B4fuuAmEfCa/wJCWhJXEg==@in.constantcontact.com
+X-Roving-Campaignid: 1142303825511
+X-Roving-Id: 1142292127529.1568868847
+X-Feedback-ID: f01e1fba-e026-11f0-9aff-02425a125712:d35f8a8b-6325-4cc1-843f-173ad8776616:1142292127529:CTCT
+X-CTCT-ID: f011565e-e026-11f0-9aff-02425a125712
+
+------=_Part_471444577_1098660608.1772487521690
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Today's Off-Market AZ Deals =F0=9F=94=A5 43 Off-Market Arizona Deals Phoeni=
+x =E2=80=A2 Scottsdale =E2=80=A2 Mesa =E2=80=A2 Glendale =E2=80=A2 Avondale=
+ =E2=80=A2 Chandler =E2=80=A2 Tempe =E2=80=A2 Gilbert =E2=80=A2 Peoria =E2=
+=80=A2 Sun City =E2=80=A2 Fountain Hills =E2=80=A2 Queen Creek =E2=80=A2 Sa=
+n Tan Valley =E2=80=A2 Tucson =E2=80=A2 Nogales =E2=80=A2 Florence =E2=80=
+=A2 Lakeside =E2=80=A2 Payson =E2=80=A2 Happy Jack =E2=80=A2 Bullhead City =
+=E2=80=A2 People Valley =E2=80=A2 San Miguel =E2=80=A2 Ajo For access / off=
+ers, text "AZ DEALS" + the property address + your offer terms. Call or Tex=
+t Everett (602) 376-4627 =F0=9F=93=B2 Get deals first: Join our WhatsApp Ch=
+annel =E2=86=92 Jump to City: =E2=80=A2 Phoenix =E2=80=A2 Scottsdale =E2=80=
+=A2 Mesa =E2=80=A2 Glendale =E2=80=A2 Avondale =E2=80=A2 Chandler =E2=80=A2=
+ Tempe =E2=80=A2 Gilbert =E2=80=A2 Peoria =E2=80=A2 Sun City =E2=80=A2 Foun=
+tain Hills =E2=80=A2 Queen Creek =E2=80=A2 San Tan Valley =E2=80=A2 Tucson =
+=E2=80=A2 Nogales =E2=80=A2 Florence =E2=80=A2 Lakeside =E2=80=A2 Payson =
+=E2=80=A2 Happy Jack =E2=80=A2 Bullhead City =E2=80=A2 People Valley =E2=80=
+=A2 San Miguel =E2=80=A2 Ajo =F0=9F=93=A3 LENDERS & PRIVATE CAPITAL Your ad=
+ could be right here. This email is sent to active Arizona buyers looking f=
+or fix & flips, rentals, development, and creative deals. =F0=9F=91=89 Lend=
+ers: want your capital in front of daily deal flow? Text "LENDER AD" to (60=
+2) 376-4627 =F0=9F=93=8D PHOENIX (Text for access / terms) 3462 E Hearn Rd,=
+ Phoenix, AZ 85032 Single Family Home =E2=80=A2 5 Bed / 2 Bath =E2=80=A2 2 =
+Car Garage =E2=80=A2 2,104 SF =E2=80=A2 Lot: 14,268 SF =E2=80=A2 Built 1976=
+ =E2=80=A2 Pool ARV: $690,000 Price: $430,000 Photos / Details =E2=86=92 89=
+22 N 17th Ln, Phoenix, AZ 85021 Single Family Home =E2=80=A2 3 Bed / 2 Bath=
+ =E2=80=A2 1,696 SF =E2=80=A2 Lot: 8,904 SF =E2=80=A2 Built 1958 North Cent=
+ral Phoenix =E2=80=A2 Newer Roof =E2=80=A2 Double RV Gates Price: $459,900 =
+Photos / Details =E2=86=92 6615 W Melvin St, Phoenix, AZ 85043 Single Famil=
+y Home =E2=80=A2 3 Bed / 3 Bath =E2=80=A2 1,452 SF =E2=80=A2 Lot: 3,027 SF =
+=E2=80=A2 Built 2004 Important Notes: Interior access NOT available =E2=80=
+=A2 Property will NOT be vacant at closing =E2=80=A2 Buyer responsible for =
+eviction =E2=80=A2 DO NOT disturb occupants Price: $239,900 Photos / Detail=
+s =E2=86=92 2251 W Altadena Ave, Phoenix, AZ 85029 Single Family Home =E2=
+=80=A2 2 Bed / 1.5 Bath =E2=80=A2 891 SF =E2=80=A2 Lot: 5,955 SF =E2=80=A2 =
+Built 1961 Roof 2010 =E2=80=A2 AC 2020 =E2=80=A2 City Sewer / City Water CO=
+E: 03/31/26 =E2=80=A2 Post Possession: 30 Days =E2=80=A2 Holdback: $10,000 =
+Price: $200,000 Photos / Details =E2=86=92 13833 S 40th Street Unit #1004, =
+Phoenix, AZ 85044 Condo =E2=80=A2 3 Bed / 2.5 Bath =E2=80=A2 1,468 SF =E2=
+=80=A2 Lot: 759 SF =E2=80=A2 Built 1987 Community Pool =E2=80=A2 Attached 2=
+ Car Garage =E2=80=A2 Concrete Tile Roof =E2=80=A2 HOA: $298/Mo Price: $304=
+,950 Photos / Details =E2=86=92 406 W Kings Ave, Phoenix, AZ 85023 Single F=
+amily Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car Garage =E2=80=A2 1,618 =
+SF =E2=80=A2 Built 1984 =E2=80=A2 AC 2024 ARV: $530,000 Price: $393,500 Pho=
+tos / Details =E2=86=92 28732 N 20th Ln, Phoenix, AZ 85085 Single Family Ho=
+me =E2=80=A2 3 Bed / 2.5 Bath =E2=80=A2 2 Car Garage =E2=80=A2 2,400 SF =E2=
+=80=A2 Lot: 1,486 SF =E2=80=A2 Built 2008 ARV: $540,000 Price: $409,000 Pho=
+tos / Details =E2=86=92 =F0=9F=93=8D SCOTTSDALE 22996 N 91st Way, Scottsdal=
+e, AZ 85255 Single Family Home =E2=80=A2 3 Bed / 3 Bath =E2=80=A2 3 Car Gar=
+age =E2=80=A2 Private Pool =E2=80=A2 3,174 SF =E2=80=A2 Lot: 0.36 Acres =E2=
+=80=A2 Built 1990 Post Possession: Until 3/30/26 w/ $5K Holdback ARV: $1,75=
+0,000 Price: $1,189,990 Photos / Details =E2=86=92 7319 E Papago Dr, Scotts=
+dale, AZ 85257 Single Family Home =E2=80=A2 4 Bed / 2 Bath =E2=80=A2 1,775 =
+SF =E2=80=A2 Lot: 7,054 SF =E2=80=A2 Built 1960 Roof in great condition =E2=
+=80=A2 Brand new AC ARV: $740,000 Price: $495,000 Photos / Details =E2=86=
+=92 6145 N Granite Reef Rd, Scottsdale, AZ 85250 Town House =E2=80=A2 3 Bed=
+ / 2.5 Bath =E2=80=A2 1,584 SF =E2=80=A2 Built 1964 New plumbing =E2=80=A2 =
+New windows =E2=80=A2 New water heater =E2=80=A2 HVAC 5 years old COE: 3/27=
+ ARV: $475K=E2=80=93$500K Price: $360,000 Photos / Details =E2=86=92 8721 E=
+ Amelia Ave, Scottsdale, AZ 85251 Single Family Home =E2=80=A2 3 Bed / 2 Ba=
+th =E2=80=A2 2 Car Garage =E2=80=A2 1,812 SF =E2=80=A2 Built 1974 =E2=80=A2=
+ No HOA Post Possession: 35 Days w/ $15K Escrow Holdback ARV: $900,000 Pric=
+e: $570,000 4525 N 66th St Unit 97, Scottsdale, AZ 85251 3 Bed / 2 Bath =E2=
+=80=A2 2 Carport =E2=80=A2 2,289 SF (per tax records) =E2=80=A2 Built 1979 =
+EMD: $10K =E2=80=A2 COE: 3/10/26 Price: $425,000 Photos / Details =E2=86=92=
+ =F0=9F=93=8D MESA 2232 W Lindner Ave Unit 29, Mesa, AZ 85202 3 Bed / 3 Bat=
+h =E2=80=A2 1,531 SF =E2=80=A2 Lot: 1,620 SF =E2=80=A2 Built 1980 COE: 3/09=
+/26 =E2=80=A2 Post Possession: 14 Days =E2=80=A2 Holdback: $6K ARV: $365,00=
+0 Price: $254,900 Photos / Details =E2=86=92 4032 E Catalina Cir, Mesa, AZ =
+85206 55+ Community =E2=80=A2 2 Bed / 2 Bath =E2=80=A2 1,744 SF =E2=80=A2 R=
+oof/HVAC 5 Years Old ARV: $430,000 Price: $304,990 Photos / Details =E2=86=
+=92 2024 E 7th Ave, Mesa, AZ 85204 Single Family Home =E2=80=A2 3 Bed / 2 B=
+ath =E2=80=A2 2 Car Garage =E2=80=A2 Pool =E2=80=A2 1,872 SF =E2=80=A2 Buil=
+t 1980 ARV: $500K=E2=80=93$525K Price: $375,000 Photos / Details =E2=86=92 =
+5522 E University Dr, Mesa, AZ 85205 Fire Damaged Block Construction =E2=80=
+=A2 2 Bed / 2 Bath =E2=80=A2 1 Car Garage =E2=80=A2 850 SF =E2=80=A2 Lot: 7=
+,976 SF =E2=80=A2 55+ Designated Voluntary/optional HOA (per owner) =E2=80=
+=A2 Frontage road between house and University Dr ARV: $325,000+ (more with=
+ additional sq footage) Price: $119,000 Photos / Details =E2=86=92 11259 E =
+Laguna Azul Cir, Mesa, AZ 55+ Community =E2=80=A2 2 Bed / 2 Bath =E2=80=A2 =
+1,909 SF =E2=80=A2 Golf Course Lot =E2=80=A2 Vaulted Ceilings Roof 2022 =E2=
+=80=A2 AC 2013 Price: $450,000 Photos / Details =E2=86=92 =F0=9F=93=8D GLEN=
+DALE 4611 W Monte Cristo Ave, Glendale, AZ 85306 Single Family Home =E2=80=
+=A2 4 Bed / 2 Bath =E2=80=A2 2,799 SF =E2=80=A2 Lot: 37,496 SF =E2=80=A2 Bu=
+ilt 1970 Vacant at Close =E2=80=A2 COE: 3/13/26 Price: $588,900 Photos / De=
+tails =E2=86=92 5122 W Royal Palm Rd, Glendale, AZ 85302 Single Family Home=
+ =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 Pool =E2=80=A2 2,106 SF =E2=80=A2 Lot: =
+9,300 SF =E2=80=A2 Built 1979 HVAC 2022 =E2=80=A2 Roof in good condition (1=
+0 years) Price: $365,990 Photos / Details =E2=86=92 =F0=9F=93=8D AVONDALE 1=
+1235 W Mohave St, Avondale, AZ 85323 Single Family Home =E2=80=A2 3 Bed / 2=
+ Bath =E2=80=A2 2 Car Garage =E2=80=A2 1,072 SF =E2=80=A2 Lot: 6,534 SF =E2=
+=80=A2 Built 2007 Roof: 11=E2=80=9315 Years =E2=80=A2 AC: 0=E2=80=935 Years=
+ COE: 03/25/26 =E2=80=A2 Post Possession: 15 Days =E2=80=A2 Holdback: $7,00=
+0 Price: $257,400 Photos / Details =E2=86=92 11229 W Apache St, Avondale, A=
+Z 85323 Manufactured =E2=80=A2 2 Bed / 1 Bath =E2=80=A2 850 SF =E2=80=A2 Bu=
+ilt 1973 Occupied (call for appointment) Price: $99,900 Photos / Details =
+=E2=86=92 =F0=9F=93=8D CHANDLER 198 W Kent Drive, Chandler, AZ 85225 Single=
+ Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 1,750 SF (per tax records) =
+=E2=80=A2 Lot: 9,374 SF =E2=80=A2 Built 1971 Roof under 5 years =E2=80=A2 A=
+C 10+ years (per seller) =E2=80=A2 Vacant, contact for lockbox COE: 3/12 AR=
+V: $500,000 Price: $364,900 Photos / Details =E2=86=92 1204 West McNair St,=
+ Chandler, AZ 85224 Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2=
+ Car Garage =E2=80=A2 Pool =E2=80=A2 1,503 SF =E2=80=A2 Lot: 7,762 SF =E2=
+=80=A2 Built 1982 Roof new 2025 =E2=80=A2 Windows new 2025 Price: $399,990 =
+Photos / Details =E2=86=92 =F0=9F=93=8D TEMPE 906 W Redfield Rd, Tempe, AZ =
+85283 Single Family Home =E2=80=A2 5 Bed / 2 Bath =E2=80=A2 2 Car Garage =
+=E2=80=A2 Pool =E2=80=A2 2,018 SF =E2=80=A2 Lot: 8,682 SF =E2=80=A2 Built 1=
+970 Roof & A/C 0=E2=80=935 Years Old =E2=80=A2 Occupied (call for appointme=
+nt) Post Possession: 14 Days w/ $7K Holdback Price: $426,900 Photos / Detai=
+ls =E2=86=92 =F0=9F=93=8D GILBERT 1337 S Colt Dr, Gilbert, AZ 85296 Single =
+Family Home =E2=80=A2 4 Bed / 3.5 Bath =E2=80=A2 2,900 SF =E2=80=A2 Lot: 6,=
+355 SF =E2=80=A2 Built 2006 Vacant at Close =E2=80=A2 COE: 4/01/26 Price: $=
+459,900 Photos / Details =E2=86=92 =F0=9F=93=8D PEORIA 7810 W Bloomfield Rd=
+, Peoria, AZ 85381 Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 =
+Car Garage =E2=80=A2 1,696 SF =E2=80=A2 Lot: 9,034 SF =E2=80=A2 Built 1985 =
+Occupied (call for appointment) =E2=80=A2 Vacant at Close Price: $339,900 P=
+hotos / Details =E2=86=92 7426 W Comet Ave, Peoria, AZ 85345 Single Family =
+Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 1,080 SF =E2=80=A2 Lot: 6,508 SF =
+=E2=80=A2 Built 1971 ARV: $340,000 Price: $225,000 Photos / Details =E2=86=
+=92 =F0=9F=93=8D SUN CITY 10302 W Oak Ridge Dr, Sun City, AZ 85351 Single F=
+amily Home =E2=80=A2 2 Bed / 1 Bath =E2=80=A2 1,086 SF =E2=80=A2 Lot: 9,861=
+ SF =E2=80=A2 Built 1972 COE: 7 Days Retail Price: $320,000 Price: $198,000=
+ Photos / Details =E2=86=92 =F0=9F=93=8D FOUNTAIN HILLS 16705 E Westby Dr U=
+nit 102, Fountain Hills, AZ 85268 Condo =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 =
+4 Car Carport =E2=80=A2 1,364 SF =E2=80=A2 Built 1985 Roof 6=E2=80=9310 Yea=
+rs Old =E2=80=A2 AC 0=E2=80=935 Years Old Vacant at Close =E2=80=A2 COE: 03=
+/03/26 Price: $269,900 Photos / Details =E2=86=92 =F0=9F=93=8D QUEEN CREEK =
+18585 E Ryan Rd, Queen Creek, AZ 85142 Single Family Home =E2=80=A2 4 Bed /=
+ 3 Bath =E2=80=A2 3,100 SF Property in good condition =E2=80=A2 Normal wear=
+ and tear =E2=80=A2 Roof 8 years =E2=80=A2 Kitchen/Bath 10 years =E2=80=A2 =
+Electrical & Plumbing in great shape ARV: $750,000 Price: $575,000 Photos /=
+ Details =E2=86=92 =F0=9F=93=8D SAN TAN VALLEY 39938 N Vincenza St, San Tan=
+ Valley, AZ 85140 Single Family Home =E2=80=A2 4 Bed / 2 Bath =E2=80=A2 Pri=
+vate Pool (Pebble Tec) =E2=80=A2 1,808 SF =E2=80=A2 Built 2003 Paid Off Sol=
+ar =E2=80=A2 Upgrades: Cabinets, Bathroom, Flooring, Pavers, and more! Pric=
+e: $325,000 Photos / Details =E2=86=92 =F0=9F=93=8D TUCSON 10773 N Glen Abb=
+ey Dr, Tucson, AZ 85737 Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=
+=A2 HOA $58/Year =E2=80=A2 2,228 SF =E2=80=A2 Lot: 8,215 SF =E2=80=A2 Built=
+ 1993 View by appointment ONLY Price: $289,900 Photos / Details =E2=86=92 4=
+551 S Poinciana Dr, Tucson, AZ 85730 Single Family Home =E2=80=A2 4 Bed / 2=
+ Bath =E2=80=A2 2 Car Garage =E2=80=A2 1,680 SF =E2=80=A2 Lot: 11,926 SF =
+=E2=80=A2 Built 1982 EMD: $5,000 Price: $195,000 Photos / Details =E2=86=92=
+ =F0=9F=93=8D NOGALES 1873 N Sierra Del Sol, Nogales, AZ 85621 Single Famil=
+y Home =E2=80=A2 4 Bed / 3 Bath =E2=80=A2 2,347 SF =E2=80=A2 Lot: 50,025 SF=
+ =E2=80=A2 Built 1950 COE: 10 Days ARV: $275,000 Price: $167,500 Photos / D=
+etails =E2=86=92 =F0=9F=93=8D FLORENCE 0 E Arizona Farms Rd, Florence, AZ 8=
+5132 Commercial/Industrial Land =E2=80=A2 4.87 Acres =E2=80=A2 Zoned GR Sou=
+th of Dobson Farms Technology Park =E2=80=A2 Parcel can support industrial =
+and commercial use Price: $1,215,000 Photos / Details =E2=86=92 =F0=9F=93=
+=8D LAKESIDE 540 Mountain View Dr, Lakeside, AZ 85929 Single Family Home =
+=E2=80=A2 2 Bed / 1 Bath =E2=80=A2 Owned Solar =E2=80=A2 941 SF (per tax re=
+cords) =E2=80=A2 Lot: 19,423 SF =E2=80=A2 Built 1969 Post Possession: 14 Da=
+ys w/ $10K Holdback ARV: $370,000 Price: $244,990 Photos / Details =E2=86=
+=92 =F0=9F=93=8D PAYSON 1003 N Arrowhead Dr, Payson, AZ 85541 Site-Built Ho=
+me =E2=80=A2 4 Bed / 3 Bath =E2=80=A2 4,200 SF =E2=80=A2 1.217 Acres =E2=80=
+=A2 Built 2005 Parcel # 302-75-001B Price: $920,000 Photos / Details =E2=86=
+=92 =F0=9F=93=8D HAPPY JACK 5179 Sunset Ridge Loop, Happy Jack, AZ 86024 La=
+nd / Lot One site-built home allowed + one attached ADU + one detached ADU =
+=E2=80=A2 Horses & livestock permitted Community well (one per two lots) =
+=E2=80=A2 Electricity at street =E2=80=A2 Septic approved HOA: $570/quarter=
+ ARV: $575,000 Price: $61,000 =F0=9F=93=8D BULLHEAD CITY 1372 Trane Road, B=
+ullhead City, AZ 86442 Single Family Home w/ Addition =E2=80=A2 2 Bed / 2 B=
+ath =E2=80=A2 1,028 SF =E2=80=A2 Lot: 5,000 SF =E2=80=A2 Built 1973 Price: =
+$79,999 Photos / Details =E2=86=92 =F0=9F=93=8D PEOPLE VALLEY 18462 S Quail=
+ Rd, People Valley, AZ 86332 Single Family Home =E2=80=A2 2 Bed / 1 Bath =
+=E2=80=A2 840 SF =E2=80=A2 Lot: 10,742 SF =E2=80=A2 Built 1996 COE: 10 Days=
+ ARV: $150,000 Price: $74,900 =F0=9F=93=8D SAN MIGUEL 237 S Avenue B, San M=
+iguel, AZ 85631 Located near S. McNab Pkwy & E. Webb Dr =E2=80=A2 2 Bed / 1=
+ Bath =E2=80=A2 1,053 SF =E2=80=A2 Lot: 7,199 SF EMD: $5,000 Non-Refundable=
+ =E2=80=A2 COE: 7 Days ARV: $150,000 Price: $79,500 =F0=9F=93=8D AJO 1245 N=
+ Thompson Ave, Ajo, AZ 85321 Single Family Home =E2=80=A2 2 Bed / 2 Bath =
+=E2=80=A2 1,150 SF =E2=80=A2 Built 1977 Est. Rehab: $17,000 =E2=80=A2 Poten=
+tial Rent: LTR $1,503 / Sec 8 $1,377 EMD: $1,000 =E2=80=A2 Buyer pays closi=
+ng costs + TC ARV: $205,000 =E2=80=A2 Est. Profit Margin: $85,000 Price: $7=
+9,000 + Closing Costs + TC Purchase Terms & Disclosures Earnest money depos=
+it (EMD) due within 24 hours of acceptance (unless otherwise stated). Buyer=
+ pays all closing costs and escrow fees unless otherwise negotiated. Buyer =
+to verify all property details, zoning, utilities, HOA (if any), title, fin=
+ancing terms, and access requirements. Wholesalers and Realtors: add your f=
+ee. Information provided is based on seller/third-party data and is not gua=
+ranteed. Property may be owned, under equitable title, or co-marketed. Term=
+s subject to change without notice. Important: No property is secured until=
+ EMD is received. First to EMD wins. =F0=9F=93=B2 Get deals first: Join our=
+ WhatsApp Channel =E2=86=92 Flip Flow =E2=80=A2 Phoenix, AZ Flip Flow | 281=
+2 E Broadway Rd, phoenix, AZ 85040 Unsubscribe Update Profile | Constant Co=
+ntact Data Notice Sent by everett.williams@first48offers.com powered by Try=
+ email marketing for free today!
+------=_Part_471444577_1098660608.1772487521690
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=3D"UTF-8">
+  <meta name=3D"viewport" content=3D"width=3Ddevice-width, initial-scale=3D=
+1.0">
+  <title>Today's Off-Market AZ Deals</title>
+<style>@media only screen and (max-width:480px) {
+  .footer-main-width {
+    width: 100% !important;
+  }
+  .footer-mobile-hidden {
+    display: none !important;
+  }
+  .footer-column {
+    display: block !important;
+  }
+  .footer-mobile-stack {
+    display: block !important;
+  }
+  .footer-mobile-stack-padding {
+    padding-top: 3px;
+  }
+}</style></head>
+
+<body style=3D"margin:0;padding:0;background:#ffffff;font-family:Arial,Helv=
+etica,sans-serif;color:#111827;"><img src=3D"https://jzhv59hbb.cc.rs6.net/o=
+n.jsp?ca=3Dd35f8a8b-6325-4cc1-843f-173ad8776616&a=3D1142292127529&c=3Df0115=
+65e-e026-11f0-9aff-02425a125712&ch=3Df01e1fba-e026-11f0-9aff-02425a125712" =
+/ alt=3D"">
+
+  <!--
+    SUBJECT OPTIONS:
+    1) =F0=9F=94=A5 43 Off-Market AZ Deals =E2=80=94 Phoenix =E2=80=A2 Scot=
+tsdale =E2=80=A2 Mesa =E2=80=A2 Glendale + More
+    2) Fresh AZ Inventory Just Dropped =E2=80=94 43 Properties, First to EM=
+D Wins
+    3) New Deals + Strong Spreads =E2=80=94 Arizona Wholesale List (Updated=
+) 43 Properties
+    4) Off-Market AZ Deals (Updated) =E2=80=94 43 Properties Across AZ
+    5) Today's AZ Deals: 43 New Drops Across Phoenix Metro & Beyond
+
+    PREHEADER OPTIONS:
+    1) Updated inventory inside. Text "AZ DEALS" + address + terms to (602)=
+ 376-4627.
+    2) 43 new AZ deals added. First to EMD secures the assignment.
+    3) Request photos, access, or assignment by text. No holds=E2=80=94firs=
+t EMD in wins.
+    4) Buy box friendly deals across AZ. Move fast.
+    5) Daily blast updated with 43 new properties and pricing.
+  -->
+
+  <table width=3D"100%" cellpadding=3D"0" cellspacing=3D"0">
+    <tr>
+      <td align=3D"center">
+        <table width=3D"100%" cellpadding=3D"0" cellspacing=3D"0" style=3D"=
+max-width:680px;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style=3D"padding:18px 14px 10px 14px;">
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/5aa=
+0385a-731e-446c-9b97-7c8c1e86f585.png?rdr=3Dtrue" alt=3D"Flip Flow" style=
+=3D"max-width:210px;width:100%;height:auto;display:block;border:0;">
+              <h1 style=3D"margin:16px 0 6px 0;font-size:22px;line-height:1=
+.2;">
+                =F0=9F=94=A5 43 Off-Market Arizona Deals
+              </h1>
+              <div style=3D"font-size:14px;line-height:1.6;">
+                <strong>Phoenix =E2=80=A2 Scottsdale =E2=80=A2 Mesa =E2=80=
+=A2 Glendale =E2=80=A2 Avondale =E2=80=A2 Chandler =E2=80=A2 Tempe =E2=80=
+=A2 Gilbert =E2=80=A2 Peoria =E2=80=A2 Sun City =E2=80=A2 Fountain Hills =
+=E2=80=A2 Queen Creek =E2=80=A2 San Tan Valley =E2=80=A2 Tucson =E2=80=A2 N=
+ogales =E2=80=A2 Florence =E2=80=A2 Lakeside =E2=80=A2 Payson =E2=80=A2 Hap=
+py Jack =E2=80=A2 Bullhead City =E2=80=A2 People Valley =E2=80=A2 San Migue=
+l =E2=80=A2 Ajo</strong>
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.6;=
+">
+                For access / offers, <strong>text "AZ DEALS" + the property=
+ address + your offer terms</strong>.
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.6;=
+">
+                <strong>Call or Text Everett</strong>
+                <a href=3D"tel:16023764627" style=3D"color:#2563eb;text-dec=
+oration:none;">(602) 376-4627</a>
+              </div>
+              <div style=3D"margin-top:12px;font-size:14px;line-height:1.6;=
+">
+                =F0=9F=93=B2 <strong>Get deals first:</strong>
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQNtdvdbQ7fA4NRl8R_Djp2k1ZifJ=
+THgvBwAWd3VmROAPbm3qkBNDlAHP8P88N2D2Hv1rxaHVjF_m-6t8G0FrE1UpkePini_C8fwaIrg=
+3Aw1VGOkLdXX7jLQjxUKNiO__azRjCsvshCDqekOfhpV9ot8=3D&c=3DDT7Z-TYCOo0y4sNOfjE=
+5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtn=
+YRhs5FQuBLn4MfL1U5dTOVsf-A=3D=3D" style=3D"color:#16a34a;font-weight:800;te=
+xt-decoration:none;">
+                  Join our WhatsApp Channel =E2=86=92
+                </a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0;">
+            </td>
+          </tr>
+
+          <!-- TABLE OF CONTENTS -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"background:#f9fafb;border:1px solid #e5e7eb;bor=
+der-radius:12px;padding:12px;">
+                <div style=3D"font-size:14px;font-weight:800;margin-bottom:=
+8px;">Jump to City:</div>
+                <div style=3D"font-size:14px;line-height:1.9;">
+                  =E2=80=A2 <a href=3D"#phoenix" style=3D"color:#2563eb;fon=
+t-weight:800;text-decoration:none;">Phoenix</a><br>
+                  =E2=80=A2 <a href=3D"#scottsdale" style=3D"color:#2563eb;=
+font-weight:800;text-decoration:none;">Scottsdale</a><br>
+                  =E2=80=A2 <a href=3D"#mesa" style=3D"color:#2563eb;font-w=
+eight:800;text-decoration:none;">Mesa</a><br>
+                  =E2=80=A2 <a href=3D"#glendale" style=3D"color:#2563eb;fo=
+nt-weight:800;text-decoration:none;">Glendale</a><br>
+                  =E2=80=A2 <a href=3D"#avondale" style=3D"color:#2563eb;fo=
+nt-weight:800;text-decoration:none;">Avondale</a><br>
+                  =E2=80=A2 <a href=3D"#chandler" style=3D"color:#2563eb;fo=
+nt-weight:800;text-decoration:none;">Chandler</a><br>
+                  =E2=80=A2 <a href=3D"#tempe" style=3D"color:#2563eb;font-=
+weight:800;text-decoration:none;">Tempe</a><br>
+                  =E2=80=A2 <a href=3D"#gilbert" style=3D"color:#2563eb;fon=
+t-weight:800;text-decoration:none;">Gilbert</a><br>
+                  =E2=80=A2 <a href=3D"#peoria" style=3D"color:#2563eb;font=
+-weight:800;text-decoration:none;">Peoria</a><br>
+                  =E2=80=A2 <a href=3D"#suncity" style=3D"color:#2563eb;fon=
+t-weight:800;text-decoration:none;">Sun City</a><br>
+                  =E2=80=A2 <a href=3D"#fountainhills" style=3D"color:#2563=
+eb;font-weight:800;text-decoration:none;">Fountain Hills</a><br>
+                  =E2=80=A2 <a href=3D"#queencreek" style=3D"color:#2563eb;=
+font-weight:800;text-decoration:none;">Queen Creek</a><br>
+                  =E2=80=A2 <a href=3D"#santanvalley" style=3D"color:#2563e=
+b;font-weight:800;text-decoration:none;">San Tan Valley</a><br>
+                  =E2=80=A2 <a href=3D"#tucson" style=3D"color:#2563eb;font=
+-weight:800;text-decoration:none;">Tucson</a><br>
+                  =E2=80=A2 <a href=3D"#nogales" style=3D"color:#2563eb;fon=
+t-weight:800;text-decoration:none;">Nogales</a><br>
+                  =E2=80=A2 <a href=3D"#florence" style=3D"color:#2563eb;fo=
+nt-weight:800;text-decoration:none;">Florence</a><br>
+                  =E2=80=A2 <a href=3D"#lakeside" style=3D"color:#2563eb;fo=
+nt-weight:800;text-decoration:none;">Lakeside</a><br>
+                  =E2=80=A2 <a href=3D"#payson" style=3D"color:#2563eb;font=
+-weight:800;text-decoration:none;">Payson</a><br>
+                  =E2=80=A2 <a href=3D"#happyjack" style=3D"color:#2563eb;f=
+ont-weight:800;text-decoration:none;">Happy Jack</a><br>
+                  =E2=80=A2 <a href=3D"#bullheadcity" style=3D"color:#2563e=
+b;font-weight:800;text-decoration:none;">Bullhead City</a><br>
+                  =E2=80=A2 <a href=3D"#peoplevalley" style=3D"color:#2563e=
+b;font-weight:800;text-decoration:none;">People Valley</a><br>
+                  =E2=80=A2 <a href=3D"#sanmiguel" style=3D"color:#2563eb;f=
+ont-weight:800;text-decoration:none;">San Miguel</a><br>
+                  =E2=80=A2 <a href=3D"#ajo" style=3D"color:#2563eb;font-we=
+ight:800;text-decoration:none;">Ajo</a>
+                </div>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 0 0;">
+            </td>
+          </tr>
+
+          <!-- LENDER AD SPACE -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"background:#f8fafc;border:2px dashed #cbd5e1;bo=
+rder-radius:12px;padding:14px;">
+                <div style=3D"font-size:15px;font-weight:800;margin-bottom:=
+6px;">=F0=9F=93=A3 LENDERS &amp; PRIVATE CAPITAL</div>
+                <div style=3D"font-size:14px;line-height:1.6;color:#111827;=
+">
+                  <em>Your ad could be right here.</em><br><br>
+                  This email is sent to <strong>active Arizona buyers</stro=
+ng> looking for fix &amp; flips, rentals, development, and creative deals.
+                </div>
+                <div style=3D"margin-top:10px;font-size:14px;">
+                  =F0=9F=91=89 <strong>Lenders:</strong> want your capital =
+in front of daily deal flow?<br>
+                  Text <strong>"LENDER AD"</strong> to
+                  <a href=3D"tel:16023764627" style=3D"color:#2563eb;font-w=
+eight:800;text-decoration:none;">(602) 376-4627</a>
+                </div>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 0 0;">
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: PHOENIX             -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"phoenix"></a>
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D PHOENIX</div>
+              <div style=3D"font-size:12px;color:#6b7280;margin-top:4px;">(=
+Text for access / terms)</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 3462 E Hearn Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">3462 E Hearn R=
+d, Phoenix, AZ 85032</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/3bb=
+6098f-233e-42e5-9f83-22397096cc0b.png?rdr=3Dtrue" alt=3D"3462 E Hearn Rd" s=
+tyle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;ma=
+rgin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 5 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 2,104 SF =E2=80=A2 Lot: 14,268 SF =E2=80=A2 Built 1976 =
+=E2=80=A2 Pool<br>
+                <strong>ARV:</strong> $690,000<br>
+                <strong>Price:</strong> $430,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8cOapGOsV1imWfZyO=
+tAwfKFjtOpm2kD-n-O8BRpKy-SoZRKT1qVg_VWrs5fkDDb_RBLmwl6ZJlXR7i-DjZoTJUn6F9KD=
+K1ZotArVBImFDHv8CBBL4GONySMqZbniw6wgOJDnfzS1tAMUAXftdSP197c4bxd9Gi7Fwm_S-vw=
+tI0uc=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb7R7-4A=3D=3D&c=
+h=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=3D" style=3D"=
+color:#2563eb;font-weight:800;text-decoration:none;">Photos / Details =E2=
+=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 8922 N 17th Ln -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">8922 N 17th Ln=
+, Phoenix, AZ 85021</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/4e9=
+38574-3681-41fb-8c86-43a033033bf0.png?rdr=3Dtrue" alt=3D"8922 N 17th Ln" st=
+yle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;mar=
+gin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 1,696=
+ SF =E2=80=A2 Lot: 8,904 SF =E2=80=A2 Built 1958<br>
+                North Central Phoenix =E2=80=A2 Newer Roof =E2=80=A2 Double=
+ RV Gates<br>
+                <strong>Price:</strong> $459,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO82XzcYhd969uiv40j=
+uvWZScbyERybCDK586fLULnuOLDKe8AwzQ2JzNktbAouFPV3oh2SgBnEXx_2cHF8rdMDeBM19c3=
+mNXgV3MHHi3fLupn8sWoYiVtXaLHCFOZDfAFK6CjOpe4jOKMsAP1EouwHDV85aA99HN-X6EyQsU=
+XHnSJ-qupMFP_yEg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 6615 W Melvin St -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">6615 W Melvin =
+St, Phoenix, AZ 85043</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/acf=
+bb4d1-fb34-4a96-b7a6-2e2b8a014e69.png?rdr=3Dtrue" alt=3D"6615 W Melvin St" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 3 Bath =E2=80=A2 1,452=
+ SF =E2=80=A2 Lot: 3,027 SF =E2=80=A2 Built 2004<br>
+                <strong>Important Notes:</strong> Interior access NOT avail=
+able =E2=80=A2 Property will NOT be vacant at closing =E2=80=A2 Buyer respo=
+nsible for eviction =E2=80=A2 DO NOT disturb occupants<br>
+                <strong>Price:</strong> $239,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQH7_XSIlfmSHjuKhEDyevbB2uHY8=
+CeMckIhONGGYXonjLEELrPhO8IwHwhkt38Z9OERBvUPqye7w_j2vmnLgPgFFc8cEhpLTK1PjjHw=
+JvafCXfN2XVMwUbt_mKusNZuaA5jN1uXvH2CJxfb8vQR_V4i5iOIzz7UGj_FT-gZUzDjvsO_n5M=
+iCDHvcXlgs1uaKAA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 2251 W Altadena Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">2251 W Altaden=
+a Ave, Phoenix, AZ 85029</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/899=
+37ec3-cce9-4f39-8863-a8260d143215.png?rdr=3Dtrue" alt=3D"2251 W Altadena Av=
+e" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 2 Bed / 1.5 Bath =E2=80=A2 891=
+ SF =E2=80=A2 Lot: 5,955 SF =E2=80=A2 Built 1961<br>
+                Roof 2010 =E2=80=A2 AC 2020 =E2=80=A2 City Sewer / City Wat=
+er<br>
+                <strong>COE:</strong> 03/31/26 =E2=80=A2 <strong>Post Posse=
+ssion:</strong> 30 Days =E2=80=A2 <strong>Holdback:</strong> $10,000<br>
+                <strong>Price:</strong> $200,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8PffE9RJJlC8PyGN8=
+KKkUjbxzmRw08aDBsR3Tb5WoIPNQp2TvPx2yVjiP4g6sUsCxo604KXtUT0yHRuGO-4vXl8gJwTz=
+lwR8k79tg7StpJanDtJH015JL-JJ0k94E0YMMICSRfeiljizcLUrdmjo3K7yVVtFDt9MFViqufY=
+B-qfM=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb7R7-4A=3D=3D&c=
+h=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=3D" style=3D"=
+color:#2563eb;font-weight:800;text-decoration:none;">Photos / Details =E2=
+=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 13833 S 40th Street Unit #1004 -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">13833 S 40th S=
+treet Unit #1004, Phoenix, AZ 85044</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/206=
+2a855-2c99-476b-8321-f4e3748d4869.png?rdr=3Dtrue" alt=3D"13833 S 40th Stree=
+t" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Condo =E2=80=A2 3 Bed / 2.5 Bath =E2=80=A2 1,468 SF =E2=80=
+=A2 Lot: 759 SF =E2=80=A2 Built 1987<br>
+                Community Pool =E2=80=A2 Attached 2 Car Garage =E2=80=A2 Co=
+ncrete Tile Roof =E2=80=A2 HOA: $298/Mo<br>
+                <strong>Price:</strong> $304,950
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQJzkyzlZneZ-tXSfJjQAwjnCqcQ_=
+Lwy5HzD6MxcMjhAgZtSh_QMVDRQ8K_9Q_slNDjI5neTqhRFRZnUGUB5FL0iVc5UiIWLSCtGFB7a=
+we-bJCZ1OVOkQGXydG1EYv0hGl2djkdbAq5qNCRefZEEICXTSfwP63zEoykGE4OK3QhLJB1onJs=
+ccW7OxepwxhH_NGA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 406 W Kings Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">406 W Kings Av=
+e, Phoenix, AZ 85023</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/b32=
+1e310-8cd2-4b6d-b196-6c0d6aed14d6.png?rdr=3Dtrue" alt=3D"406 W Kings Ave" s=
+tyle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;ma=
+rgin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 1,618 SF =E2=80=A2 Built 1984 =E2=80=A2 AC 2024<br>
+                <strong>ARV:</strong> $530,000<br>
+                <strong>Price:</strong> $393,500
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8ruVtI90sIlxdDXCE=
+ZqvrE2FLqEf60bb6THPtudCLJykVnF7GnWc3fCzAuuI0j9AUrFubD3gE2mYHbhuS4CAQT3u8Bhk=
+vyc3uiIGrEAi0l9x0HteeN_nhEtZn7SlBcf90kVFS8GwWFhii0aesquDpX_GNj8Deu5sr05BGby=
+oHOcfM_uIZy6xiJQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 28732 N 20th Ln -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">28732 N 20th L=
+n, Phoenix, AZ 85085</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/cd8=
+70237-4781-4114-86fb-55593e2c1697.png?rdr=3Dtrue" alt=3D"28732 N 20th Ln" s=
+tyle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;ma=
+rgin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2.5 Bath =E2=80=A2 2 C=
+ar Garage =E2=80=A2 2,400 SF =E2=80=A2 Lot: 1,486 SF =E2=80=A2 Built 2008<b=
+r>
+                <strong>ARV:</strong> $540,000<br>
+                <strong>Price:</strong> $409,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO80SFnXpRwBagcwfBO=
+lqfTG1Tt_U3p0LMF9c68nQwUtF8TzfsjUdqR50rgLp7UvJmL1o2iVYjtAnQs46eUoSGHPKansNi=
+yjRek826g8J1xLRlE4S1VpSv_YJee65iHlireU8E_4Ehc-uN4OHbT8FVZHBiZgqK5G7xokxNXVR=
+rEQhasf8p6j0x0iA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: SCOTTSDALE          -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"scottsdale"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D SCOTTSDALE</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 22996 N 91st Way -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">22996 N 91st W=
+ay, Scottsdale, AZ 85255</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/1fa=
+76d94-0d82-4e60-b128-89110ed0d00b.png?rdr=3Dtrue" alt=3D"22996 N 91st Way" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 3 Bath =E2=80=A2 3 Car=
+ Garage =E2=80=A2 Private Pool =E2=80=A2 3,174 SF =E2=80=A2 Lot: 0.36 Acres=
+ =E2=80=A2 Built 1990<br>
+                <strong>Post Possession:</strong> Until 3/30/26 w/ $5K Hold=
+back<br>
+                <strong>ARV:</strong> $1,750,000<br>
+                <strong>Price:</strong> $1,189,990
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8mgbfFuyvby6_nhuR=
+hoZ9P0e5y-Ea4DfccWjzRRwhr5DG1dmR8YzeGTv0EMfvsvHDS_RM4_v7gwwyxDbqK13kIOOCzL2=
+_q768Fj9-GSzVZh6qJzJmiOVqgPPtmrifyeIvssAJp2ccLRpDtwXfudlMpD4nPqP4QvGmyiDNe4=
+SsQ4-5VoggnlYQSQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 7319 E Papago Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">7319 E Papago =
+Dr, Scottsdale, AZ 85257</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/2ff=
+a0399-fe53-48d3-bce7-cb4383503bd9.png?rdr=3Dtrue" alt=3D"7319 E Papago Dr" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 2 Bath =E2=80=A2 1,775=
+ SF =E2=80=A2 Lot: 7,054 SF =E2=80=A2 Built 1960<br>
+                Roof in great condition =E2=80=A2 Brand new AC<br>
+                <strong>ARV:</strong> $740,000<br>
+                <strong>Price:</strong> $495,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8MHMnakTkOHXvcy9L=
+qegsVlF7rPOCkXDc7z-2KfUujT_AQ0K8xjqeWRxSw5qA3QkrTg3zo7cPfKkQh4ptOuvYPu7kmcz=
+rjAfxRkXU4vHZ6DrJNkdOoKJ1SKeImcbPoAoDWKpEvUpdE7YGKEG-ttwPxY5QGU7gzhWKl6HT1f=
+y8xdjbHH209pDafw=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 6145 N Granite Reef Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">6145 N Granite=
+ Reef Rd, Scottsdale, AZ 85250</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/164=
+cc38c-1bed-4b8d-99ef-67c36aa770fe.png?rdr=3Dtrue" alt=3D"6145 N Granite Ree=
+f Rd" style=3D"width:100%;height:auto;display:block;border:0;border-radius:=
+10px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Town House =E2=80=A2 3 Bed / 2.5 Bath =E2=80=A2 1,584 SF =
+=E2=80=A2 Built 1964<br>
+                New plumbing =E2=80=A2 New windows =E2=80=A2 New water heat=
+er =E2=80=A2 HVAC 5 years old<br>
+                <strong>COE:</strong> 3/27<br>
+                <strong>ARV:</strong> $475K=E2=80=93$500K<br>
+                <strong>Price:</strong> $360,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8KdEX5UBQnnnE86lG=
+0jTL4Ze4eviLII9olgogT9nft15Bc2G-Kh3Zj7kg2_c-A8z77uiWtK0K9VUF32NHl-OJcOKdGDS=
+Aj7wd5XWYT06_0djjQca6bBjcbhzpofMTdPFUcTL5gLyuLYpATSSoevUZc1QYBcXlM2qxQ8sZ9y=
+Y6W7s0Pu8mo4cZ4g=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 8721 E Amelia Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">8721 E Amelia =
+Ave, Scottsdale, AZ 85251</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/8ab=
+d3a39-c573-4e24-96f5-d4d709f998be.png?rdr=3Dtrue" alt=3D"8721 E Amelia Ave"=
+ style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;=
+margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 1,812 SF =E2=80=A2 Built 1974 =E2=80=A2 No HOA<br>
+                <strong>Post Possession:</strong> 35 Days w/ $15K Escrow Ho=
+ldback<br>
+                <strong>ARV:</strong> $900,000<br>
+                <strong>Price:</strong> $570,000
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 4525 N 66th St Unit 97 -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">4525 N 66th St=
+ Unit 97, Scottsdale, AZ 85251</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/679=
+30069-dc2c-453e-b3a5-734df493f291.png?rdr=3Dtrue" alt=3D"4525 N 66th St" st=
+yle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;mar=
+gin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                3 Bed / 2 Bath =E2=80=A2 2 Carport =E2=80=A2 2,289 SF (per =
+tax records) =E2=80=A2 Built 1979<br>
+                <strong>EMD:</strong> $10K =E2=80=A2 <strong>COE:</strong> =
+3/10/26<br>
+                <strong>Price:</strong> $425,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8HkUj3J2jeWUr3WMI=
+R-BeYGVnHgxizGB6BhCKQiX-8aHZwpb29DPphC7heKJfaY2PbBYZLPCnywhUaLrjikm6r6doXkj=
+H_lcZRbzI0xjB6EZGqUENTZrmAoinfzyDacTn7gkQPnfsuxFKtAdcdOcnZvqo4ati8spB1ne-Kx=
+liXTVnEB5c-bbBLA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: MESA                -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"mesa"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D MESA</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 2232 W Lindner Ave Unit 29 -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">2232 W Lindner=
+ Ave Unit 29, Mesa, AZ 85202</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/1d0=
+3b309-822f-4f91-b76b-404a36bf6dda.png?rdr=3Dtrue" alt=3D"2232 W Lindner Ave=
+" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px=
+;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                3 Bed / 3 Bath =E2=80=A2 1,531 SF =E2=80=A2 Lot: 1,620 SF =
+=E2=80=A2 Built 1980<br>
+                <strong>COE:</strong> 3/09/26 =E2=80=A2 <strong>Post Posses=
+sion:</strong> 14 Days =E2=80=A2 <strong>Holdback:</strong> $6K<br>
+                <strong>ARV:</strong> $365,000<br>
+                <strong>Price:</strong> $254,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8eHBV5nVdp_3EKrmT=
+cOBhUvc82uvtsawVsHy2JhVSAuUTl9Rmh4aI0-tXN-hT7SiwfbHF9eIGSdc_Oe89p8t6vGw5Rmk=
+bDBDbqwkPmWt6Wau6MsLVyuOzT1_FcyAV1cKvDeGEqNMyX1QptrwIIy0ngdOHB1UNcTkyynZPwD=
+o9NnD1VvdTgpDMlA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 4032 E Catalina Cir -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">4032 E Catalin=
+a Cir, Mesa, AZ 85206</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/ad2=
+ff805-634d-42b4-a2b1-89ea0e553c29.png?rdr=3Dtrue" alt=3D"4032 E Catalina Ci=
+r" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                55+ Community =E2=80=A2 2 Bed / 2 Bath =E2=80=A2 1,744 SF =
+=E2=80=A2 Roof/HVAC 5 Years Old<br>
+                <strong>ARV:</strong> $430,000<br>
+                <strong>Price:</strong> $304,990
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8qi8w4nj0dgTym68w=
+pwYm05uJ1szWqUQdCkSafaTnRFZ7hZIqKCx8bxuMnuQ0b-uESqAvqpt0Y60brd-0qJz-BzhtLr4=
+2tW8PE7ZWX56alQGeD7k7NloAEIkOrZtn0lquyXioUwqQj3lJViR10Ty0Ur9tsCe67_cVtbgaxV=
+MGFob9dii8VLMoeQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 2024 E 7th Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">2024 E 7th Ave=
+, Mesa, AZ 85204</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/6f4=
+95570-4f06-45d1-92be-1aca5fad73b9.png?rdr=3Dtrue" alt=3D"2024 E 7th Ave" st=
+yle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;mar=
+gin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 Pool =E2=80=A2 1,872 SF =E2=80=A2 Built 1980<br>
+                <strong>ARV:</strong> $500K=E2=80=93$525K<br>
+                <strong>Price:</strong> $375,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8fxEyYGggML1s5lke=
+vGtTwvJDOhr9S-03rCsjvrt8Gesiqk44L1FPtW8UjEvE1b1nCReNIGfMisdu0HtKSW62ItjGN2Z=
+v5vJeEegnRC2qvQScsCxuO9YDKWRgj7obULJoaNqQm4z9BTswqRtfipHTlUieMZY1gAU4S4egYz=
+OgnzBtH5wIytjudA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 5522 E University Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">5522 E Univers=
+ity Dr, Mesa, AZ 85205</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/e77=
+f57e3-168e-4b83-ad2b-ff6f717b1828.png?rdr=3Dtrue" alt=3D"5522 E University =
+Dr" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10=
+px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Fire Damaged Block Construction =E2=80=A2 2 Bed / 2 Bath =
+=E2=80=A2 1 Car Garage =E2=80=A2 850 SF =E2=80=A2 Lot: 7,976 SF =E2=80=A2 5=
+5+ Designated<br>
+                Voluntary/optional HOA (per owner) =E2=80=A2 Frontage road =
+between house and University Dr<br>
+                <strong>ARV:</strong> $325,000+ (more with additional sq fo=
+otage)<br>
+                <strong>Price:</strong> $119,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8wEy4aLom_Xb_ZZuA=
+auyGg81L72WV1-YaRns7Dvnx3XW5nKdXAlybC05UGyvZyRWNO_C2DC56YAnbQ592_o1vlWaZrIV=
+OMBF3snAk1cNLNwhWZBJTuXXzBNWz4bN2kOccFSHfApjFj5woId136GtovxUqC-tdKDHsjViLzb=
+xPeU8ckj6AUX0-Sg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 11259 E Laguna Azul Cir -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">11259 E Laguna=
+ Azul Cir, Mesa, AZ</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/1d0=
+1653c-3e26-4a31-b3c2-38ac25aa4c3d.png?rdr=3Dtrue" alt=3D"11259 E Laguna Azu=
+l Cir" style=3D"width:100%;height:auto;display:block;border:0;border-radius=
+:10px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                55+ Community =E2=80=A2 2 Bed / 2 Bath =E2=80=A2 1,909 SF =
+=E2=80=A2 Golf Course Lot =E2=80=A2 Vaulted Ceilings<br>
+                Roof 2022 =E2=80=A2 AC 2013<br>
+                <strong>Price:</strong> $450,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8O3fldkVHBiVYc4sJ=
+k17_94bdLuEAPuUx6-XZGK-5xBJv4ltxYy-P10LtBk0ZRk-RQ_hFptymugZpffD1p5EimYIf5kf=
+g4FP-08g7qt5j9wCM-QEoPCNwR7tSFGICcJGfB6ESObVAV_MsAyU_govrCZPfAxV3lSioU5YstS=
+49ZCoj91HHNkDv1w=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: GLENDALE            -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"glendale"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D GLENDALE</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 4611 W Monte Cristo Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">4611 W Monte C=
+risto Ave, Glendale, AZ 85306</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/aeb=
+8241c-e1b7-46f3-8bb5-135b7adf1269.png?rdr=3Dtrue" alt=3D"4611 W Monte Crist=
+o Ave" style=3D"width:100%;height:auto;display:block;border:0;border-radius=
+:10px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 2 Bath =E2=80=A2 2,799=
+ SF =E2=80=A2 Lot: 37,496 SF =E2=80=A2 Built 1970<br>
+                Vacant at Close =E2=80=A2 <strong>COE:</strong> 3/13/26<br>
+                <strong>Price:</strong> $588,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO85VHmEUM3VdShavTy=
+A2mgHlKXWpGgONW0vCzoAoeuAJgu3C6fUZQw86qbjmvW2SdDpuo0BN4zSw-vhA6SH2iOWjhPU17=
+ph_sGMhXspYAOojt_umicPADKOONRUNpkWi_GhS-DAoNYbZuALg9lzcDDivI4efqmXW3DF5i75B=
+HkqsyLGyIxf8a9fg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 5122 W Royal Palm Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">5122 W Royal P=
+alm Rd, Glendale, AZ 85302</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/c34=
+148d0-3017-4633-9aec-22328c19f4e3.png?rdr=3Dtrue" alt=3D"5122 W Royal Palm =
+Rd" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10=
+px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 Pool =
+=E2=80=A2 2,106 SF =E2=80=A2 Lot: 9,300 SF =E2=80=A2 Built 1979<br>
+                HVAC 2022 =E2=80=A2 Roof in good condition (10 years)<br>
+                <strong>Price:</strong> $365,990
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8_NRAwFgsQuLK5V2W=
+G_pRFQAYicPY6fRWl7-sfMhYnOO9j43GSGZN79nC2TbieQt6YcPU2MoJD0I-SKQk5hnmbyF33g9=
+6EAeIuiSMmCBJrGD1JKvQYQsoKS7aTepFFmZUBuVzG-QlQsJWrcHTGaIJDoO_HtsNJ-rINTMgkG=
+AJ0PQ_4MGTlCwYBg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: AVONDALE            -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"avondale"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D AVONDALE</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 11235 W Mohave St -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">11235 W Mohave=
+ St, Avondale, AZ 85323</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/b16=
+27d9e-6bc9-4282-a31c-42d33de306e9.png?rdr=3Dtrue" alt=3D"11235 W Mohave St"=
+ style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;=
+margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 1,072 SF =E2=80=A2 Lot: 6,534 SF =E2=80=A2 Built 2007<br>
+                Roof: 11=E2=80=9315 Years =E2=80=A2 AC: 0=E2=80=935 Years<b=
+r>
+                <strong>COE:</strong> 03/25/26 =E2=80=A2 <strong>Post Posse=
+ssion:</strong> 15 Days =E2=80=A2 <strong>Holdback:</strong> $7,000<br>
+                <strong>Price:</strong> $257,400
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8WAas2XIEHeAqh8i0=
+TzgBJ9nrXgL1nGmwKvJH5zFsno8AKuq-Nf_W2eYnEDXlIZpR8M51pOdAHeAPYbc6otpFaMXC-0C=
+NaU5nBILAzafHxA05eWT9IJNQyfF8ptUgh5PPawd9xU3xN6q6bSvVRjvkt_UbymeTvs5qjqMnS1=
+EocPjTTIrivbo3-A=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 11229 W Apache St -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">11229 W Apache=
+ St, Avondale, AZ 85323</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/d73=
+c104f-c455-46b1-91a2-b5fabdc90ea9.png?rdr=3Dtrue" alt=3D"11229 W Apache St"=
+ style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;=
+margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Manufactured =E2=80=A2 2 Bed / 1 Bath =E2=80=A2 850 SF =E2=
+=80=A2 Built 1973<br>
+                Occupied (call for appointment)<br>
+                <strong>Price:</strong> $99,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8GcdRzGbIhpvZ8a9a=
+l8eCHg8a2SKSkWmkzKPf7xZnwc2i22fmd8OHUWCYY7na1wDbSysY6alOHa-twRRgrj_m3Beac5l=
+MqFnG0dZHp6Hi1yXYiOO9kNbWR7XIvZ242PunOSQntLCjPzp8u8_3GXvbqCDuy8Lcxq6aFtCRCE=
+ZtuL5LA03KLEXWPg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: CHANDLER            -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"chandler"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D CHANDLER</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 198 W Kent Drive -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">198 W Kent Dri=
+ve, Chandler, AZ 85225</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/df6=
+778b2-0777-4a60-9f06-253d89a58263.png?rdr=3Dtrue" alt=3D"198 W Kent Drive" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 1,750=
+ SF (per tax records) =E2=80=A2 Lot: 9,374 SF =E2=80=A2 Built 1971<br>
+                Roof under 5 years =E2=80=A2 AC 10+ years (per seller) =E2=
+=80=A2 Vacant, contact for lockbox<br>
+                <strong>COE:</strong> 3/12<br>
+                <strong>ARV:</strong> $500,000<br>
+                <strong>Price:</strong> $364,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8s4iUVSp5vbH87gWX=
+ES6GTVh20FlY3AFfn8HiiHaG7mbrWRrceZCKkvndyZHxk38HuRI_0f8IwjDWleGPe6dZzufve5u=
+y5f4L480RwWuPRi-GMme3EcOVZUo3m0QcilddR92NP5Y42WS1xewVYXeQIzpg_9Xpnn5ni1VSDX=
+nQ5HTs3_CMkDLMKw=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 1204 West McNair St -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">1204 West McNa=
+ir St, Chandler, AZ 85224</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/d54=
+9c51d-f036-4e21-9cb3-5e55cca6b2c7.png?rdr=3Dtrue" alt=3D"1204 W McNair St" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 Pool =E2=80=A2 1,503 SF =E2=80=A2 Lot: 7,762 SF =E2=80=A2=
+ Built 1982<br>
+                Roof new 2025 =E2=80=A2 Windows new 2025<br>
+                <strong>Price:</strong> $399,990
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8q2p37vhmhsQvL9R8=
+8qzEaoe6eGx2zzoGmobJcJE79vZEwaCp7XsDqADoRjLR3zMOINDetDcYvh-gu3pAXt7HY6ze7Rb=
+s2FitmK2MbsdGmwNRwXMnw6fQPAt-LCAHGW3IyOW7rFz5S7W-j3WLQpJZ7dTROGQ56JhlwWRe8O=
+JwfiRxk5EHcvsk2Q=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: TEMPE               -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"tempe"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D TEMPE</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 906 W Redfield Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">906 W Redfield=
+ Rd, Tempe, AZ 85283</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/7a6=
+1304c-b804-49bd-95b6-1ec691d4502d.png?rdr=3Dtrue" alt=3D"906 W Redfield Rd"=
+ style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;=
+margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 5 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 Pool =E2=80=A2 2,018 SF =E2=80=A2 Lot: 8,682 SF =E2=80=A2=
+ Built 1970<br>
+                Roof &amp; A/C 0=E2=80=935 Years Old =E2=80=A2 Occupied (ca=
+ll for appointment)<br>
+                <strong>Post Possession:</strong> 14 Days w/ $7K Holdback<b=
+r>
+                <strong>Price:</strong> $426,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8oewv9VRGWUJJ-TxU=
+vkb6keunHftdF5nRYeBNeKUIk5emZTONl72DqxHB4t7XvtmLkhFI6JyAJ5Ogx_a4nCCqsvuGadv=
+yGAsj3c7psXNDvubRf4WoRZjEDmNJE96y1tCwMksuTf9s8cqMi3Mcz12PdmKpf1IyRnftEKeWAJ=
+uQDk6jwfqZT-6yDQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: GILBERT             -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"gilbert"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D GILBERT</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 1337 S Colt Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">1337 S Colt Dr=
+, Gilbert, AZ 85296</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/605=
+8738e-80e8-4543-98ad-24604be88c31.png?rdr=3Dtrue" alt=3D"1337 S Colt Dr" st=
+yle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;mar=
+gin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 3.5 Bath =E2=80=A2 2,9=
+00 SF =E2=80=A2 Lot: 6,355 SF =E2=80=A2 Built 2006<br>
+                Vacant at Close =E2=80=A2 <strong>COE:</strong> 4/01/26<br>
+                <strong>Price:</strong> $459,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8pTJskiEfGCs1Xls-=
+nh2AhEDue1P21bvod1ysiMkHIzs9f3q6ADul2EfCi2SlELm5ek8r5RRvQ5xBXFhXqVg6-eZBjcv=
+aXxdxKFSoOY0MDgOaOR5iNQdleOfnrag1sO5XSpHQcA3RcSe7jt-x0nlZawlR4if6AkZNN3femE=
+RXONq5GDh9lNy3ew=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: PEORIA              -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"peoria"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D PEORIA</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 7810 W Bloomfield Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">7810 W Bloomfi=
+eld Rd, Peoria, AZ 85381</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/ba6=
+73f7f-69d7-433f-ba3e-4451dab0d982.png?rdr=3Dtrue" alt=3D"7810 W Bloomfield =
+Rd" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10=
+px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 1,696 SF =E2=80=A2 Lot: 9,034 SF =E2=80=A2 Built 1985<br>
+                Occupied (call for appointment) =E2=80=A2 Vacant at Close<b=
+r>
+                <strong>Price:</strong> $339,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8XUgZASRpBUx1znOj=
+vkwvsd91EqfoumfyhdrJtatWxCF4QXdVccjEDppto9TZAxg0J5d2-ggKuXiubJuMT7lp7020z4N=
+arB-NDHKCF0nbnZDMa-KcavfJEAYCQt4evKBnGt_nvNGGPk8-EgTPE-WUyniWSZ5jrOPwYml3jD=
+pZy8bKq_0XCS4rDQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 7426 W Comet Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">7426 W Comet A=
+ve, Peoria, AZ 85345</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/83b=
+369ae-fcd1-4788-9cc6-dff5bbe451a2.png?rdr=3Dtrue" alt=3D"7426 W Comet Ave" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 1,080=
+ SF =E2=80=A2 Lot: 6,508 SF =E2=80=A2 Built 1971<br>
+                <strong>ARV:</strong> $340,000<br>
+                <strong>Price:</strong> $225,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8bStK8F5J9lkc0i0a=
+dIlpvx_42r6ib_Wnq0DPPtcoIMkFi7uYX7uUpn1QmyJ3TUbLdPrV7a6XbFxSzzU_Y57kXUenBxg=
+CBz06jAJbppA2vgHyVeWp0nV_kl6lmKlcfjRjESNT--wJj4e2vM1IqTrPHvXKh1LBGEhsQyTLQN=
+kgoFqYRRTjG0hBSA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: SUN CITY            -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"suncity"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D SUN CITY</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 10302 W Oak Ridge Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">10302 W Oak Ri=
+dge Dr, Sun City, AZ 85351</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/76e=
+c9959-2a3c-4608-a067-41f8d39930ac.png?rdr=3Dtrue" alt=3D"10302 W Oak Ridge =
+Dr" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10=
+px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 2 Bed / 1 Bath =E2=80=A2 1,086=
+ SF =E2=80=A2 Lot: 9,861 SF =E2=80=A2 Built 1972<br>
+                <strong>COE:</strong> 7 Days<br>
+                <strong>Retail Price:</strong> $320,000<br>
+                <strong>Price:</strong> $198,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQLuy9FPguWC8xVdGZM8kUaLvuZJx=
+eFRBk9dw5ibP1E1vAep0Sdz5_4yKGsvprN9Go8HvR0uaO4-T8nONwSI_qhpwnYfY3b6rmSPfBq_=
+pAw4baaJPN-I_bJRvkPVxdA41z6kgfQZKOwPdYyNS81KQh0q0t71RvIUtrsqR7LSrW0DXhowoYl=
+t_qV3QGKWDQQA24A=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: FOUNTAIN HILLS      -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"fountainhills"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D FOUNTAIN HILLS</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 16705 E Westby Dr Unit 102 -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">16705 E Westby=
+ Dr Unit 102, Fountain Hills, AZ 85268</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/557=
+8944a-e794-4f3c-910b-f9661c40cab0.png?rdr=3Dtrue" alt=3D"16705 E Westby Dr"=
+ style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;=
+margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Condo =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 4 Car Carport =E2=
+=80=A2 1,364 SF =E2=80=A2 Built 1985<br>
+                Roof 6=E2=80=9310 Years Old =E2=80=A2 AC 0=E2=80=935 Years =
+Old<br>
+                Vacant at Close =E2=80=A2 <strong>COE:</strong> 03/03/26<br=
+>
+                <strong>Price:</strong> $269,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQPNHCdqggxQjaLBnUxADtAksAfKM=
+GpKTNspmiQNOk1eWVz8wuHNbr3D-wU4hQbSdcKT-H-q0VGy28FEHYU-uncUjx_bPZ38Cf_jE5DQ=
+Lwc6_bJMD-1_fsBvGeHc4Tkhy_gCs-di-qHWDvl6bWtncyZt48BCH7ByN4LYvYXiDiIoDrw9RZg=
+FQWG90y7AGyjw62Q=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: QUEEN CREEK         -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"queencreek"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D QUEEN CREEK</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 18585 E Ryan Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">18585 E Ryan R=
+d, Queen Creek, AZ 85142</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/572=
+71f72-f2e3-4b83-89b7-826ea8d3cd8d.png?rdr=3Dtrue" alt=3D"18585 E Ryan Rd" s=
+tyle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;ma=
+rgin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 3 Bath =E2=80=A2 3,100=
+ SF<br>
+                Property in good condition =E2=80=A2 Normal wear and tear =
+=E2=80=A2 Roof 8 years =E2=80=A2 Kitchen/Bath 10 years =E2=80=A2 Electrical=
+ &amp; Plumbing in great shape<br>
+                <strong>ARV:</strong> $750,000<br>
+                <strong>Price:</strong> $575,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8k1TcnIVFncNSQuGP=
+lu_1W5KcmqfaZ3gi-mUhxSbojyN4qDr4t4fBFHnHgBy09fmcWIz8fihlL2dgvJZCph5xmt_cWJG=
+eeJTnk-JNCFFQtMOAAF7l-yrEeaDLFjQ3yjZ5CQehz5IdopcIk6fD8W8FUxRsFoTPFX4mjVfeaq=
+SLnJjEMd078KqExQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: SAN TAN VALLEY      -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"santanvalley"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D SAN TAN VALLEY</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 39938 N Vincenza St -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">39938 N Vincen=
+za St, San Tan Valley, AZ 85140</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/456=
+ffec3-61a3-41ce-8bfe-c66cfde30279.png?rdr=3Dtrue" alt=3D"39938 N Vincenza S=
+t" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 2 Bath =E2=80=A2 Priva=
+te Pool (Pebble Tec) =E2=80=A2 1,808 SF =E2=80=A2 Built 2003<br>
+                Paid Off Solar =E2=80=A2 Upgrades: Cabinets, Bathroom, Floo=
+ring, Pavers, and more!<br>
+                <strong>Price:</strong> $325,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8EpXeEaQUR-wfust1=
+AXPIxBNaaUjBdcSEIj62iS-8zWWhf3JTiBeQ96MiSbxSESYHSN2YvarR85v-Vk8M3cOBMeBs9Jk=
+yrHtk800r478YWiiGZDgwORBjgNeylvxRWboKDYJcWsNoP7GtIEtv6ennG4mzrcvyE-zkxoWNBV=
+Sh26sJ99rAycOQIQ=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: TUCSON              -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"tucson"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D TUCSON</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 10773 N Glen Abbey Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 18px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">10773 N Glen A=
+bbey Dr, Tucson, AZ 85737</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/570=
+a5786-5ba7-4d48-baff-e08eb4724d1a.png?rdr=3Dtrue" alt=3D"10773 N Glen Abbey=
+ Dr" style=3D"width:100%;height:auto;display:block;border:0;border-radius:1=
+0px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 3 Bed / 2 Bath =E2=80=A2 HOA $=
+58/Year =E2=80=A2 2,228 SF =E2=80=A2 Lot: 8,215 SF =E2=80=A2 Built 1993<br>
+                View by appointment ONLY<br>
+                <strong>Price:</strong> $289,900
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8mdRZ3mzGT6lw5f0z=
+uuL4M5UO9fwUaMICkFI9eXRrNmlTmpWWl5m8Qrv9-kfkEun49011Q7LUSjaqcNBYngfI1pLt-pG=
+Wxsp4H4QOI6SmDxzWEH5S_BIfRCwB6e2-tZ4yGU-PKr7gcukXXE_9MIpcg5bdzRDJJGCwKbKp3-=
+gfvXGwaEXs1evmaw=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+16px 0;">
+            </td>
+          </tr>
+
+          <!-- 4551 S Poinciana Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">4551 S Poincia=
+na Dr, Tucson, AZ 85730</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/23e=
+cf3ec-34f3-4206-b7e6-213185929116.png?rdr=3Dtrue" alt=3D"4551 S Poinciana D=
+r" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 2 Bath =E2=80=A2 2 Car=
+ Garage =E2=80=A2 1,680 SF =E2=80=A2 Lot: 11,926 SF =E2=80=A2 Built 1982<br=
+>
+                <strong>EMD:</strong> $5,000<br>
+                <strong>Price:</strong> $195,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8A_cbsUptvFCHOgaU=
+22Z-lUb_erJD9Yicc9ioP3YoJ_ZVHh7BhebqcVVSx2ufW42wN9PPBXuEM58W6ttHZeu4rLNFRfx=
+G8Eykn6X3u31DhNxXrllpudDSBMPW3VOHXLpNTUq8PxbMC3Ylpn6uLSNxhLXdgl1Rh8LMHBWQ6b=
+FKtJnrszPJOJkHEg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: NOGALES             -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"nogales"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D NOGALES</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 1873 N Sierra Del Sol -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">1873 N Sierra =
+Del Sol, Nogales, AZ 85621</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/6dd=
+b6a4d-e499-4d46-9cae-ce7075256192.png?rdr=3Dtrue" alt=3D"1873 N Sierra Del =
+Sol" style=3D"width:100%;height:auto;display:block;border:0;border-radius:1=
+0px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 4 Bed / 3 Bath =E2=80=A2 2,347=
+ SF =E2=80=A2 Lot: 50,025 SF =E2=80=A2 Built 1950<br>
+                <strong>COE:</strong> 10 Days<br>
+                <strong>ARV:</strong> $275,000<br>
+                <strong>Price:</strong> $167,500
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO87WGt1ErgFjBDlcrC=
+e-lq3Scp9h4PCs8KG9UDr7WHQlY-0PahKuF6m6R4KVaBabEssBWB1WB3LTcNnmItF0UGNBD98_n=
+gDc4ApMbVKnUhkiAJK-AFvaRV5J4zF_HQFKScA8XLlxHcqe3KQ6SEfW4AErbsWbfuMw7-z-oCkD=
+jwlFzZBmVKiydSkA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: FLORENCE            -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"florence"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D FLORENCE</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 0 E Arizona Farms Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">0 E Arizona Fa=
+rms Rd, Florence, AZ 85132</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/abe=
+e19f6-2b9e-4c94-8874-e7064cf19ac3.png?rdr=3Dtrue" alt=3D"0 E Arizona Farms =
+Rd" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10=
+px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Commercial/Industrial Land =E2=80=A2 4.87 Acres =E2=80=A2 Z=
+oned GR<br>
+                South of Dobson Farms Technology Park =E2=80=A2 Parcel can =
+support industrial and commercial use<br>
+                <strong>Price:</strong> $1,215,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8F1bIgZxQxyyUjJLh=
+fa2LAloyWodzTvEPcnBDWTKTCQmFxv4RkFFytnugko3xehYNu8ahdOlUmcUCr9rWt8XKnTcMDKN=
+u2jf6AFk1jsUtBjwSlmTrqEEkw9n_jfOK1lumtbNySpsr3NA5LqZG0g1D8iZPtCx-eP8aFwdk39=
+0hyBreJ_GqvtH5gg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: LAKESIDE            -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"lakeside"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D LAKESIDE</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 540 Mountain View Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">540 Mountain V=
+iew Dr, Lakeside, AZ 85929</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/a75=
+c9281-f5c0-450a-9420-08304776e0d3.png?rdr=3Dtrue" alt=3D"540 Mountain View =
+Dr" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10=
+px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 2 Bed / 1 Bath =E2=80=A2 Owned=
+ Solar =E2=80=A2 941 SF (per tax records) =E2=80=A2 Lot: 19,423 SF =E2=80=
+=A2 Built 1969<br>
+                <strong>Post Possession:</strong> 14 Days w/ $10K Holdback<=
+br>
+                <strong>ARV:</strong> $370,000<br>
+                <strong>Price:</strong> $244,990
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8zvelq4EYwg6z3Hcw=
+is443-YbE1UftDWrEnmMXYXpBnw6Yqb0ekQOowJSEsN5xB2Y1WBd6MJZ_jKd4EGNHksWKY99dtt=
+aI5IQsr5WDxgqdYCpi7rp2uaYYV9mheABgZFOEadZdug-GgZPvAOCvU81uHcukQKAgjDnQs-R51=
+9MHkSanBrdYbcXOA=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: PAYSON              -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"payson"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D PAYSON</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 1003 N Arrowhead Dr -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">1003 N Arrowhe=
+ad Dr, Payson, AZ 85541</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/5ba=
+c8a68-723a-4281-8098-51e652d14bf5.png?rdr=3Dtrue" alt=3D"1003 N Arrowhead D=
+r" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Site-Built Home =E2=80=A2 4 Bed / 3 Bath =E2=80=A2 4,200 SF=
+ =E2=80=A2 1.217 Acres =E2=80=A2 Built 2005<br>
+                Parcel # 302-75-001B<br>
+                <strong>Price:</strong> $920,000
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8sowmACnWgBTKrPz7=
+flPiy4UIIRduoDKxEf6KhNveId8dBr7tim6_pkreTPDXrouPn5d9hLvUi17L7M4duSsQWD7nSlr=
+z6SYG6P9lulWuZbtDnDX8E9p4JBeLTW_lzf-knrAkm6xklR6D4aKGU6iGdTu26JXaka56pAzTKv=
+28CUR3GHknxMng7w=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: HAPPY JACK          -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"happyjack"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D HAPPY JACK</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 5179 Sunset Ridge Loop -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">5179 Sunset Ri=
+dge Loop, Happy Jack, AZ 86024</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/b41=
+0f3d8-5a9d-4ef1-b875-f82ff9371715.png?rdr=3Dtrue" alt=3D"5179 Sunset Ridge =
+Loop" style=3D"width:100%;height:auto;display:block;border:0;border-radius:=
+10px;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Land / Lot<br>
+                One site-built home allowed + one attached ADU + one detach=
+ed ADU =E2=80=A2 Horses &amp; livestock permitted<br>
+                Community well (one per two lots) =E2=80=A2 Electricity at =
+street =E2=80=A2 Septic approved<br>
+                HOA: $570/quarter<br>
+                <strong>ARV:</strong> $575,000<br>
+                <strong>Price:</strong> $61,000
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: BULLHEAD CITY       -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"bullheadcity"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D BULLHEAD CITY</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 1372 Trane Road -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">1372 Trane Roa=
+d, Bullhead City, AZ 86442</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/b37=
+a59df-bab3-4b0f-8177-7a582cba7bb2.png?rdr=3Dtrue" alt=3D"1372 Trane Road" s=
+tyle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;ma=
+rgin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home w/ Addition =E2=80=A2 2 Bed / 2 Bath =E2=
+=80=A2 1,028 SF =E2=80=A2 Lot: 5,000 SF =E2=80=A2 Built 1973<br>
+                <strong>Price:</strong> $79,999
+              </div>
+              <div style=3D"margin-top:10px;font-size:14px;">
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQA0NcSRGMKO8mEMdbyIfMfysyr7a=
+5LH6spjYTsW6YcMdAVQnt1An8ygrkuSuOUC4le6N7djt6SmjD8CRh2fRj-PgfD5lou52yd7nH5b=
+NxVkVWM1m3kFOT70tX-ABsVI9YR3OauXb7CNx-UATX_yPo2QmjwiQ7y3goEubcTdBmTFIB-U1qT=
+Z_Bq0kFLvUMlemYg=3D=3D&c=3DDT7Z-TYCOo0y4sNOfjE5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb=
+7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtnYRhs5FQuBLn4MfL1U5dTOVsf-A=3D=
+=3D" style=3D"color:#2563eb;font-weight:800;text-decoration:none;">Photos /=
+ Details =E2=86=92</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: PEOPLE VALLEY       -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"peoplevalley"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D PEOPLE VALLEY</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 18462 S Quail Rd -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">18462 S Quail =
+Rd, People Valley, AZ 86332</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/0e0=
+8f662-b149-462e-b415-23269bcb2adc.png?rdr=3Dtrue" alt=3D"18462 S Quail Rd" =
+style=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;m=
+argin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 2 Bed / 1 Bath =E2=80=A2 840 S=
+F =E2=80=A2 Lot: 10,742 SF =E2=80=A2 Built 1996<br>
+                <strong>COE:</strong> 10 Days<br>
+                <strong>ARV:</strong> $150,000<br>
+                <strong>Price:</strong> $74,900
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: SAN MIGUEL          -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"sanmiguel"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D SAN MIGUEL</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 237 S Avenue B -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">237 S Avenue B=
+, San Miguel, AZ 85631</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/b0b=
+ff683-8b23-4ebf-8c9c-32be49aefffd.png?rdr=3Dtrue" alt=3D"237 S Avenue B" st=
+yle=3D"width:100%;height:auto;display:block;border:0;border-radius:10px;mar=
+gin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Located near S. McNab Pkwy &amp; E. Webb Dr =E2=80=A2 2 Bed=
+ / 1 Bath =E2=80=A2 1,053 SF =E2=80=A2 Lot: 7,199 SF<br>
+                <strong>EMD:</strong> $5,000 Non-Refundable =E2=80=A2 <stro=
+ng>COE:</strong> 7 Days<br>
+                <strong>ARV:</strong> $150,000<br>
+                <strong>Price:</strong> $79,500
+              </div>
+            </td>
+          </tr>
+
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <!-- CITY: AJO                 -->
+          <!-- =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D -->
+          <tr>
+            <td style=3D"padding:0 14px 6px 14px;">
+              <a name=3D"ajo"></a>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+18px 0 12px 0;">
+              <div style=3D"font-size:18px;font-weight:900;margin:0;">=F0=
+=9F=93=8D AJO</div>
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+12px 0;">
+            </td>
+          </tr>
+
+          <!-- 1245 N Thompson Ave -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;">
+              <div style=3D"font-size:16px;font-weight:800;">1245 N Thompso=
+n Ave, Ajo, AZ 85321</div>
+              <img src=3D"https://files.constantcontact.com/92f9ae5f901/39f=
+e3d70-e194-40a2-8367-98bbacad4654.png?rdr=3Dtrue" alt=3D"1245 N Thompson Av=
+e" style=3D"width:100%;height:auto;display:block;border:0;border-radius:10p=
+x;margin-top:10px;">
+              <div style=3D"margin-top:10px;font-size:14px;line-height:1.65=
+;">
+                Single Family Home =E2=80=A2 2 Bed / 2 Bath =E2=80=A2 1,150=
+ SF =E2=80=A2 Built 1977<br>
+                Est. Rehab: $17,000 =E2=80=A2 Potential Rent: LTR $1,503 / =
+Sec 8 $1,377<br>
+                <strong>EMD:</strong> $1,000 =E2=80=A2 Buyer pays closing c=
+osts + TC<br>
+                <strong>ARV:</strong> $205,000 =E2=80=A2 Est. Profit Margin=
+: $85,000<br>
+                <strong>Price:</strong> $79,000 + Closing Costs + TC
+              </div>
+            </td>
+          </tr>
+
+          <!-- TERMS -->
+          <tr>
+            <td style=3D"padding:0 14px 14px 14px;">
+              <hr style=3D"border:none;border-top:1px solid #e5e7eb;margin:=
+10px 0 14px 0;">
+              <div style=3D"font-size:18px;font-weight:800;margin:0 0 8px 0=
+;">
+                Purchase Terms &amp; Disclosures
+              </div>
+              <div style=3D"font-size:14px;line-height:1.65;">
+                <strong>Earnest money deposit (EMD)</strong> due within 24 =
+hours of acceptance (unless otherwise stated).<br>
+                Buyer pays all closing costs and escrow fees unless otherwi=
+se negotiated.<br>
+                Buyer to verify all property details, zoning, utilities, HO=
+A (if any), title, financing terms, and access requirements.<br>
+                Wholesalers and Realtors: add your fee. Information provide=
+d is based on seller/third-party data and is not guaranteed.<br>
+                Property may be owned, under equitable title, or co-markete=
+d. Terms subject to change without notice.<br><br>
+                <strong>Important:</strong> No property is secured until EM=
+D is received. <strong>First to EMD wins.</strong>
+              </div>
+              <div style=3D"margin-top:12px;font-size:14px;">
+                =F0=9F=93=B2 <strong>Get deals first:</strong>
+                <a href=3D"https://jzhv59hbb.cc.rs6.net/tn.jsp?f=3D001rqJGt=
+UzQiJwjrPM5B4AT_H1YVlxIckfkguZ5OQiIeLk0TlMNerSFQNtdvdbQ7fA4NRl8R_Djp2k1ZifJ=
+THgvBwAWd3VmROAPbm3qkBNDlAHP8P88N2D2Hv1rxaHVjF_m-6t8G0FrE1UpkePini_C8fwaIrg=
+3Aw1VGOkLdXX7jLQjxUKNiO__a8USIbIf126xUzQIJkqs73w=3D&c=3DDT7Z-TYCOo0y4sNOfjE=
+5Y9UhsMzMUMZzhLSkWDeSxzH1RFDb7R7-4A=3D=3D&ch=3DZfhx59WINI-jcwZL04BsdbeKvMtn=
+YRhs5FQuBLn4MfL1U5dTOVsf-A=3D=3D" style=3D"color:#16a34a;font-weight:800;te=
+xt-decoration:none;">
+                  Join our WhatsApp Channel =E2=86=92
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style=3D"padding:0 14px 22px 14px;font-size:12px;color:#6b7=
+280;line-height:1.5;">
+              Flip Flow =E2=80=A2 Phoenix, AZ
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+<table class=3D"footer-container" width=3D"100%" cellpadding=3D"0" cellspac=
+ing=3D"0" border=3D"0" style=3D"background: #ffffff; margin-left: auto; mar=
+gin-right: auto; table-layout: auto !important" bgcolor=3D"#ffffff">
+  <tr>
+    <td width=3D"100%" align=3D"center" valign=3D"top" style=3D"width: 100%=
+;">
+      <div class=3D"footer-max-main-width" align=3D"center" style=3D"margin=
+-left: auto; margin-right: auto; max-width: 100%;">
+        <table width=3D"100%" cellpadding=3D"0" cellspacing=3D"0" border=3D=
+"0">
+          <tr>
+            <td class=3D"footer-layout" align=3D"center" valign=3D"top" sty=
+le=3D"padding: 16px 0px;">
+              <table class=3D"footer-main-width" style=3D"width: 580px;" bo=
+rder=3D"0" cellpadding=3D"0" cellspacing=3D"0">
+                <tr>
+                  <td class=3D"footer-text" align=3D"center" valign=3D"top"=
+ style=3D"color: #5d5d5d; font-family: Verdana,Geneva,sans-serif; font-size=
+: 12px; padding: 4px 0px;">
+                   =20
+                    <span class=3D"footer-column">Flip Flow<span class=3D"f=
+ooter-mobile-hidden"> | </span></span><span class=3D"footer-column">2812 E =
+Broadway Rd<span class=3D"footer-mobile-hidden">, </span></span><span class=
+=3D"footer-column"></span><span class=3D"footer-column"></span><span class=
+=3D"footer-column">phoenix, AZ 85040</span><span class=3D"footer-column"></=
+span>
+                   =20
+                  </td>
+                </tr>
+                <tr>
+                  <td class=3D"footer-row" align=3D"center" valign=3D"top" =
+style=3D"padding: 10px 0px;">
+                    <table cellpadding=3D"0" cellspacing=3D"0" border=3D"0"=
+>
+                      <tr>
+                        <td class=3D"footer-text" align=3D"center" valign=
+=3D"top" style=3D"color: #5d5d5d; font-family: Verdana,Geneva,sans-serif; f=
+ont-size: 12px; padding: 4px 0px;">
+                          <a href=3D"https://visitor.constantcontact.com/do=
+?p=3Dun&m=3D001N3lxtzeJBSZkaGUufRgKxw=3D=3D&ch=3Df01e1fba-e026-11f0-9aff-02=
+425a125712&ca=3Dd35f8a8b-6325-4cc1-843f-173ad8776616" style=3D"color: #5d5d=
+5d">Unsubscribe</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class=3D"footer-text" align=3D"center" valign=
+=3D"top" style=3D"color: #5d5d5d; font-family: Verdana,Geneva,sans-serif; f=
+ont-size: 12px; padding: 4px 0px;">
+                          <a href=3D"https://visitor.constantcontact.com/do=
+?ch=3Df01e1fba-e026-11f0-9aff-02425a125712&t=3D001CkbuCuvtEV1TC15abRIrYw=3D=
+=3D&lang=3D001FCSs65SMrsI=3D&m=3D001N3lxtzeJBSZkaGUufRgKxw=3D=3D&p=3Doo&ca=
+=3Dd35f8a8b-6325-4cc1-843f-173ad8776616" style=3D"color: #5d5d5d">Update Pr=
+ofile</a> |
+                         =20
+                          <a class=3D"footer-about-provider" href=3D"https:=
+//www.constantcontact.com/legal/customer-contact-data-notice" style=3D"colo=
+r: #5d5d5d">Constant Contact Data Notice</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class=3D"footer-text" align=3D"center" valign=
+=3D"top" style=3D"color: #5d5d5d; font-family: Verdana,Geneva,sans-serif; f=
+ont-size: 12px; padding: 4px 0px;">
+                          Sent by
+                         =20
+                          <a href=3D"mailto:everett.williams@first48offers.=
+com" style=3D"color: #5d5d5d; text-decoration: none">everett.williams@first=
+48offers.com</a>
+                         =20
+
+                         =20
+                         =20
+                          <span class=3D"footer-column">powered by</span>
+                         =20
+                         =20
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td class=3D"footer-text" align=3D"center" valign=3D"top"=
+ style=3D"color: #5d5d5d; font-family: Verdana,Geneva,sans-serif; font-size=
+: 12px; padding: 4px 0px;">
+                   =20
+                   =20
+                    <a href=3D"https://www.constantcontact.com/landing1/vr/=
+home?cc=3Dnge&utm_campaign=3Dnge&rmc=3DVF21_ACE&utm_medium=3DVF21_ACE&utm_s=
+ource=3Dviral&pn=3DROVING&nav=3Dd35f8a8b-6325-4cc1-843f-173ad8776616" style=
+=3D"color: #5d5d5d; text-decoration: none">
+                    <img alt=3D"Trusted Email from Constant Contact - Try i=
+t FREE today." width=3D"160" border=3D"0" hspace=3D"0" vspace=3D"0" src=3D"=
+https://static.ctctcdn.com/letters/images/CTCTFooter/Logo_Blue_Orange_2022.=
+png">
+                    </a>
+                    <div class=3D"footer-cta-text" style=3D"color: #5d5d5d;=
+ font-family: Verdana,Geneva,sans-serif; font-size: 9px; line-height: 2">
+                    <a href=3D"https://www.constantcontact.com/landing1/vr/=
+home?cc=3Dnge&utm_campaign=3Dnge&rmc=3DVF21_ACE&utm_medium=3DVF21_ACE&utm_s=
+ource=3Dviral&pn=3DROVING&nav=3Dd35f8a8b-6325-4cc1-843f-173ad8776616" style=
+=3D"color: #5d5d5d; text-decoration: none">Try email marketing for free tod=
+ay!</a>
+                    </div>
+                   =20
+                   =20
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table></body>
+</html>
+------=_Part_471444577_1098660608.1772487521690--
