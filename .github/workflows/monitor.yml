@@ -18,6 +18,7 @@ concurrency:
 jobs:
   run-monitor:
     runs-on: ubuntu-latest
+    environment: main
     steps:
       - name: Checkout
         uses: actions/checkout@v4
