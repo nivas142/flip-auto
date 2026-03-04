@@ -611,8 +611,20 @@ def main() -> int:
         print("No notifier enabled; running in dry-run mode.")
 
     matches: list[AlertItem] = []
-    matches.extend(scan_emails(config))
-    matches.extend(scan_sheet(config))
+    try:
+        matches.extend(scan_emails(config))
+    except Exception as exc:
+        print(
+            f"[WARN] Email scan failed ({exc.__class__.__name__}: {exc}). Continuing.",
+            file=sys.stderr,
+        )
+    try:
+        matches.extend(scan_sheet(config))
+    except Exception as exc:
+        print(
+            f"[WARN] Sheet scan failed ({exc.__class__.__name__}: {exc}). Continuing.",
+            file=sys.stderr,
+        )
 
     sent = 0
     for item in matches:
