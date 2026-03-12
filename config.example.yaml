@@ -13,10 +13,12 @@ email:
     - deals@exohomesolutions.com
     - everett.williams-first48offers.com@shared1.ccsend.com
     - jeremiah@networthaz.com
+    - deals@carterbuysaz.com
   cities:
     - Chandler
     - Gilbert
     - Queen Creek
+    - Flagstaff
 
 gsheet:
   enabled: true
