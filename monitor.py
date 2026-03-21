@@ -101,6 +101,30 @@ def contains_city(text: str, cities: list[str]) -> str | None:
     return None
 
 
+CARTER_SENDER_ALIASES = {
+    "deals@carterbuyaz.com",
+    "deals@carterbuysaz.com",
+}
+
+
+def detect_email_city(msg: Message, from_header: str, subject: str, body: str, cities: list[str]) -> tuple[str | None, list["PropertyDeal"]]:
+    parsed_deals = extract_property_deals_from_email(msg, cities)
+    sender = from_header.lower()
+
+    # Carter emails include city names in the footer; restrict matching to the
+    # subject line and extracted property deals to avoid footer-only alerts.
+    if any(alias in sender for alias in CARTER_SENDER_ALIASES):
+        city = contains_city(subject, cities)
+        if city:
+            return city, parsed_deals
+        if parsed_deals:
+            return parsed_deals[0].city, parsed_deals
+        return None, parsed_deals
+
+    full_text = f"{subject}\n{body}"
+    return contains_city(full_text, cities), parsed_deals
+
+
 def parse_email_subject(msg: Message) -> str:
     raw = msg.get("Subject", "")
     try:
@@ -376,12 +400,10 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
             subject = normalize_text(parse_email_subject(msg))
             received_at = parse_email_timestamp(msg)
             body = parse_email_body(msg)
-            full_text = f"{subject}\n{body}"
-            city = contains_city(full_text, cities)
+            city, parsed_deals = detect_email_city(msg, from_header, subject, body, cities)
             if not city:
                 continue
 
-            parsed_deals = extract_property_deals_from_email(msg, cities)
             city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
 
             msg_key = msg.get("Message-ID", "") or str(msg_id, errors="ignore")
