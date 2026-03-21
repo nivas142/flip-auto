@@ -8,12 +8,15 @@ email:
   username: REPLACE_WITH_EMAIL_USERNAME
   password: REPLACE_WITH_EMAIL_APP_PASSWORD
   folder: INBOX
+  # Optional. If set, overrides lookback_minutes with a clearer hour-based window.
+  lookback_hours: 48
   lookback_minutes: 120
   sender_filters:
     - deals@exohomesolutions.com
     - everett.williams-first48offers.com@shared1.ccsend.com
     - jeremiah@networthaz.com
     - deals@carterbuysaz.com
+    - chris@networthaz.com
   cities:
     - Chandler
     - Gilbert

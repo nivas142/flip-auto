@@ -36,6 +36,7 @@ jobs:
         env:
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_LOOKBACK_HOURS: ${{ secrets.EMAIL_LOOKBACK_HOURS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GSHEET_PUBLIC_URL: ${{ secrets.GSHEET_PUBLIC_URL }}
@@ -64,7 +65,12 @@ jobs:
 
           cfg.setdefault("email", {})["username"] = os.environ["EMAIL_USERNAME"]
           cfg.setdefault("email", {})["password"] = os.environ["EMAIL_APP_PASSWORD"]
-          cfg.setdefault("email", {})["lookback_minutes"] = 120
+
+          email_cfg = cfg.setdefault("email", {})
+          lookback_hours = os.getenv("EMAIL_LOOKBACK_HOURS", "").strip()
+          if lookback_hours:
+              email_cfg["lookback_hours"] = int(lookback_hours)
+
           cfg.setdefault("telegram", {})["bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
           cfg.setdefault("telegram", {})["chat_id"] = os.environ["TELEGRAM_CHAT_ID"]
 

@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 import csv
 import io
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email import message_from_bytes
@@ -34,6 +36,14 @@ from bs4 import BeautifulSoup
 
 
 UTC = timezone.utc
+PROXY_ENV_KEYS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
 
 
 @dataclass
@@ -93,6 +103,30 @@ def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
+def is_bad_local_proxy(value: str) -> bool:
+    proxy = normalize_text(value).lower()
+    return proxy in {
+        "http://127.0.0.1:9",
+        "https://127.0.0.1:9",
+        "http://localhost:9",
+        "https://localhost:9",
+    }
+
+
+@contextmanager
+def bypass_invalid_local_proxies():
+    removed: dict[str, str] = {}
+    try:
+        for key in PROXY_ENV_KEYS:
+            value = os.environ.get(key)
+            if value and is_bad_local_proxy(value):
+                removed[key] = value
+                del os.environ[key]
+        yield
+    finally:
+        os.environ.update(removed)
+
+
 def contains_city(text: str, cities: list[str]) -> str | None:
     lower = text.lower()
     for city in cities:
@@ -144,6 +178,19 @@ def parse_email_timestamp(msg: Message) -> str:
         return dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     except Exception:
         return raw_date
+
+
+def parse_email_datetime(msg: Message) -> datetime | None:
+    raw_date = normalize_text(msg.get("Date", ""))
+    if not raw_date:
+        return None
+    try:
+        dt = parsedate_to_datetime(raw_date)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
+    except Exception:
+        return None
 
 
 def parse_email_body(msg: Message) -> str:
@@ -350,13 +397,54 @@ def load_public_sheet_rows(sheet_cfg: dict[str, Any]) -> tuple[list[dict[str, An
     if not csv_url:
         return None
 
-    with urlopen(csv_url, timeout=30) as response:
-        raw = response.read()
+    with bypass_invalid_local_proxies():
+        with urlopen(csv_url, timeout=30) as response:
+            raw = response.read()
 
     decoded = raw.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(decoded))
     rows: list[dict[str, Any]] = [dict(row) for row in reader]
     return rows, csv_url
+
+
+def get_row_value(row: dict[str, Any], column_name: str) -> str:
+    target = normalize_text(column_name).lower()
+    if not target:
+        return ""
+    for key, value in row.items():
+        if normalize_text(str(key)).lower() == target:
+            return normalize_text(str(value))
+    return ""
+
+
+def row_snippets(row: dict[str, Any], content_columns: list[str]) -> list[str]:
+    snippets: list[str] = []
+
+    if content_columns:
+        for col in content_columns:
+            val = get_row_value(row, col)
+            if val:
+                snippets.append(f"{col}: {val}")
+        if snippets:
+            return snippets
+
+    for key, value in row.items():
+        key_text = normalize_text(str(key))
+        value_text = normalize_text(str(value))
+        if not key_text and not value_text:
+            continue
+        if "disclaimer! please read" in key_text.lower():
+            if value_text:
+                snippets.append(value_text)
+            continue
+        if key_text and value_text:
+            snippets.append(f"{key_text}: {value_text}")
+        elif value_text:
+            snippets.append(value_text)
+        else:
+            snippets.append(key_text)
+
+    return snippets
 
 
 def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
@@ -368,9 +456,14 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
     username = email_cfg["username"]
     password = email_cfg["password"]
     folder = email_cfg.get("folder", "INBOX")
-    lookback_minutes = int(email_cfg.get("lookback_minutes", 30))
+    lookback_hours = email_cfg.get("lookback_hours")
+    if lookback_hours is not None:
+        lookback_minutes = int(lookback_hours) * 60
+    else:
+        lookback_minutes = int(email_cfg.get("lookback_minutes", 30))
     sender_filters = [s.lower() for s in email_cfg.get("sender_filters", [])]
     cities = email_cfg.get("cities", [])
+    cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
 
     results: list[AlertItem] = []
 
@@ -381,7 +474,7 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
         if status != "OK":
             raise RuntimeError(f"Could not select folder '{folder}'")
 
-        since_date = (datetime.now(UTC) - timedelta(minutes=lookback_minutes)).strftime("%d-%b-%Y")
+        since_date = cutoff_dt.strftime("%d-%b-%Y")
         status, msg_ids = mail.search(None, f'(SINCE "{since_date}")')
         if status != "OK":
             return []
@@ -392,6 +485,9 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
                 continue
             raw = data[0][1]
             msg = message_from_bytes(raw)
+            msg_dt = parse_email_datetime(msg)
+            if msg_dt is not None and msg_dt < cutoff_dt:
+                continue
 
             from_header = normalize_text(msg.get("From", ""))
             if sender_filters and not any(sender in from_header.lower() for sender in sender_filters):
@@ -488,6 +584,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
 
         try:
             import gspread
+            import json as json_module
             from google.oauth2.service_account import Credentials
 
             scopes = [
@@ -495,12 +592,18 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
                 "https://www.googleapis.com/auth/drive.readonly",
             ]
 
-            creds = Credentials.from_service_account_file(credentials_file, scopes=scopes)
-            gc = gspread.authorize(creds)
+            # Some exported JSON key files include a UTF-8 BOM; load with
+            # utf-8-sig so service-account auth remains robust.
+            with Path(credentials_file).open("r", encoding="utf-8-sig") as f:
+                service_account_info = json_module.load(f)
 
-            sh = gc.open_by_key(spreadsheet_id)
-            ws = sh.worksheet(worksheet_name)
-            rows = ws.get_all_records()
+            with bypass_invalid_local_proxies():
+                creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+                gc = gspread.authorize(creds)
+
+                sh = gc.open_by_key(spreadsheet_id)
+                ws = sh.worksheet(worksheet_name)
+                rows = ws.get_all_records()
             source_key = f"{spreadsheet_id}:{worksheet_name}"
         except Exception as exc:
             print(
@@ -513,22 +616,17 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     results: list[AlertItem] = []
 
     for row in rows:
-        city_val = normalize_text(str(row.get(city_column, "")))
-        city_match = contains_city(city_val, cities)
+        city_val = get_row_value(row, city_column)
+        row_text = normalize_text("\n".join(row_snippets(row, [])))
+        city_match = contains_city(city_val, cities) or contains_city(row_text, cities)
         if not city_match:
             continue
 
-        row_id_val = normalize_text(str(row.get(row_id_column, "")))
+        row_id_val = get_row_value(row, row_id_column)
         if not row_id_val:
-            row_id_val = stable_id([json.dumps(row, sort_keys=True)])
+            row_id_val = stable_id([json.dumps(row, sort_keys=True, ensure_ascii=True)])
 
-        snippets: list[str] = []
-        for col in content_columns:
-            if col in row:
-                val = normalize_text(str(row[col]))
-                if val:
-                    snippets.append(f"{col}: {val}")
-
+        snippets = row_snippets(row, content_columns)
         if not snippets:
             snippets.append(normalize_text(json.dumps(row, ensure_ascii=True)))
 

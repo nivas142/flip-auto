@@ -26,6 +26,7 @@ Copy-Item config.example.yaml config.yaml
 
 Edit `config.yaml`:
 - `email.sender_filters` for allowed senders.
+- `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
 - `email.cities` and `gsheet.cities` for target cities.
 - Telegram bot credentials (`telegram.bot_token`, `telegram.chat_id`).
 - Google Sheet source details (public link or service account).
@@ -79,6 +80,7 @@ Required:
 - `TELEGRAM_CHAT_ID`
 
 Optional:
+- `EMAIL_LOOKBACK_HOURS` (overrides the template's email lookback window for GitHub Actions runs)
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`
 - `GSHEET_SERVICE_ACCOUNT_JSON` (full JSON string of the service-account key)
@@ -97,7 +99,7 @@ This is required so the workflow can auto-commit `state/monitor_state.json` when
 ### 3) What the workflow does
 
 - Builds `config.yaml` from `config.example.yaml` plus GitHub Secrets.
-- Forces `email.lookback_minutes` to `120` (2 hours).
+- Keeps the template's email lookback by default, and optionally overrides it with `EMAIL_LOOKBACK_HOURS` for GitHub Actions runs.
 - If `GSHEET_SERVICE_ACCOUNT_JSON` is set, writes it to `creds/google-service-account.json` at runtime.
 - Runs `python monitor.py`.
 - Commits `state/monitor_state.json` when updated.

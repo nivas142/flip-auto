@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flip Auto Monitor"
+  short_description: "Maintain the repo's property alert monitor"
+  default_prompt: "Use $flip-auto-monitor to update or validate the property alert monitor in this repo."
