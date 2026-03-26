@@ -30,6 +30,7 @@ gsheet:
   credentials_json: creds/google-service-account.json
   spreadsheet_id: REPLACE_WITH_SHEET_ID
   worksheet: Sheet1
+  # City matching only checks column A of each row.
   city_column: city
   row_id_column: id
   content_columns:

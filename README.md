@@ -28,6 +28,7 @@ Edit `config.yaml`:
 - `email.sender_filters` for allowed senders.
 - `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
 - `email.cities` and `gsheet.cities` for target cities.
+- Google Sheet city matching only checks column A of each row.
 - Telegram bot credentials (`telegram.bot_token`, `telegram.chat_id`).
 - Google Sheet source details (public link or service account).
 

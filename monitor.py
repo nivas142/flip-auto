@@ -417,6 +417,14 @@ def get_row_value(row: dict[str, Any], column_name: str) -> str:
     return ""
 
 
+def get_first_column_value(row: dict[str, Any]) -> str:
+    for value in row.values():
+        text = normalize_text(str(value))
+        if text:
+            return text
+    return ""
+
+
 def row_snippets(row: dict[str, Any], content_columns: list[str]) -> list[str]:
     snippets: list[str] = []
 
@@ -551,7 +559,6 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     sheet_cfg = config.get("gsheet", {})
     if not sheet_cfg.get("enabled", False):
         return []
-    city_column = sheet_cfg.get("city_column", "city")
     content_columns = sheet_cfg.get("content_columns", [])
     row_id_column = sheet_cfg.get("row_id_column", "id")
     cities = sheet_cfg.get("cities", [])
@@ -616,9 +623,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     results: list[AlertItem] = []
 
     for row in rows:
-        city_val = get_row_value(row, city_column)
-        row_text = normalize_text("\n".join(row_snippets(row, [])))
-        city_match = contains_city(city_val, cities) or contains_city(row_text, cities)
+        first_column_val = get_first_column_value(row)
+        city_match = contains_city(first_column_val, cities)
         if not city_match:
             continue
 
