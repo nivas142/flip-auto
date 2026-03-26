@@ -38,9 +38,11 @@ gsheet:
     - notes
     - link
   cities:
-    - Phoenix
+    - Chandler
+    - Gilbert
+    - Queen Creek
+    - Flagstaff
     - Mesa
-    - Tempe
 
 telegram:
   enabled: true
