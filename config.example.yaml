@@ -17,11 +17,14 @@ email:
     - jeremiah@networthaz.com
     - deals@carterbuysaz.com
     - chris@networthaz.com
+    - techme2@outlook.com
+    - offers.tim.lange@gmail.com
   cities:
     - Chandler
     - Gilbert
     - Queen Creek
     - Flagstaff
+    - Mesa
 
 gsheet:
   enabled: true

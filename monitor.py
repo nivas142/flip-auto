@@ -224,6 +224,13 @@ def parse_email_body(msg: Message) -> str:
     return normalize_text("\n".join(texts))
 
 
+def extract_fetch_bytes(data: list[Any]) -> bytes | None:
+    for part in data:
+        if isinstance(part, tuple) and len(part) > 1 and isinstance(part[1], (bytes, bytearray)):
+            return bytes(part[1])
+    return None
+
+
 def decode_email_part(msg: Message, content_type: str) -> str:
     if msg.is_multipart():
         parts: list[str] = []
@@ -488,18 +495,31 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
             return []
 
         for msg_id in msg_ids[0].split():
-            status, data = mail.fetch(msg_id, "(RFC822)")
-            if status != "OK" or not data or not data[0]:
+            status, header_data = mail.fetch(msg_id, "(BODY.PEEK[HEADER])")
+            if status != "OK" or not header_data:
                 continue
-            raw = data[0][1]
-            msg = message_from_bytes(raw)
-            msg_dt = parse_email_datetime(msg)
+            header_raw = extract_fetch_bytes(header_data)
+            if not header_raw:
+                continue
+            header_msg = message_from_bytes(header_raw)
+            msg_dt = parse_email_datetime(header_msg)
             if msg_dt is not None and msg_dt < cutoff_dt:
                 continue
 
-            from_header = normalize_text(msg.get("From", ""))
+            from_header = normalize_text(header_msg.get("From", ""))
             if sender_filters and not any(sender in from_header.lower() for sender in sender_filters):
                 continue
+
+            status, data = mail.fetch(msg_id, "(BODY.PEEK[])")
+            if status != "OK" or not data:
+                continue
+            raw = extract_fetch_bytes(data)
+            if not raw:
+                continue
+            msg = message_from_bytes(raw)
+
+            # Explicitly mark only configured-sender messages as read.
+            mail.store(msg_id, "+FLAGS", "\\Seen")
 
             subject = normalize_text(parse_email_subject(msg))
             received_at = parse_email_timestamp(msg)
