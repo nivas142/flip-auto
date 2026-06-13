@@ -29,12 +29,14 @@ email:
 
 gsheet:
   enabled: true
+  # Easiest option: publish/share the tab as CSV and paste the export URL here.
+  public_csv_url:
   public_url: https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit?gid=0#gid=0
   public_gid: 0
   credentials_json: creds/google-service-account.json
   spreadsheet_id: REPLACE_WITH_SHEET_ID
   worksheet: Sheet1
-  # City matching only checks column A of each row.
+  # City matching checks city_column first, then column A, then the full row.
   city_column: city
   row_id_column: id
   content_columns:

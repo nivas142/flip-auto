@@ -82,12 +82,13 @@ Required:
 
 Optional:
 - `EMAIL_LOOKBACK_HOURS` (overrides the template's email lookback window for GitHub Actions runs)
+- `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`
 - `GSHEET_SERVICE_ACCOUNT_JSON` (full JSON string of the service-account key)
 
 Google Sheet secret combinations:
-- Public-sheet mode: set `GSHEET_PUBLIC_URL`.
+- Public-sheet mode: set `GSHEET_PUBLIC_CSV_URL` or `GSHEET_PUBLIC_URL`.
 - Service-account mode: set `GSHEET_SERVICE_ACCOUNT_JSON` and `GSHEET_SPREADSHEET_ID`.
 
 ### 2) Enable workflow write access

@@ -39,6 +39,7 @@ jobs:
           EMAIL_LOOKBACK_HOURS: ${{ secrets.EMAIL_LOOKBACK_HOURS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GSHEET_PUBLIC_CSV_URL: ${{ secrets.GSHEET_PUBLIC_CSV_URL }}
           GSHEET_PUBLIC_URL: ${{ secrets.GSHEET_PUBLIC_URL }}
           GSHEET_SPREADSHEET_ID: ${{ secrets.GSHEET_SPREADSHEET_ID }}
           GSHEET_SERVICE_ACCOUNT_JSON: ${{ secrets.GSHEET_SERVICE_ACCOUNT_JSON }}
@@ -74,20 +75,24 @@ jobs:
           cfg.setdefault("telegram", {})["bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
           cfg.setdefault("telegram", {})["chat_id"] = os.environ["TELEGRAM_CHAT_ID"]
 
+          gsheet_public_csv_url = os.getenv("GSHEET_PUBLIC_CSV_URL", "").strip()
           gsheet_public_url = os.getenv("GSHEET_PUBLIC_URL", "").strip()
           gsheet_spreadsheet_id = os.getenv("GSHEET_SPREADSHEET_ID", "").strip()
           gsheet_service_account_json = os.getenv("GSHEET_SERVICE_ACCOUNT_JSON", "").strip()
 
           gsheet_cfg = cfg.setdefault("gsheet", {})
+          gsheet_cfg["public_csv_url"] = gsheet_public_csv_url
           gsheet_cfg["public_url"] = gsheet_public_url
 
-          if not gsheet_public_url and not gsheet_service_account_json:
+          if not gsheet_public_csv_url and not gsheet_public_url and not gsheet_service_account_json:
               raise SystemExit(
-                  "Set either GSHEET_PUBLIC_URL or GSHEET_SERVICE_ACCOUNT_JSON for sheet access."
+                  "Set GSHEET_PUBLIC_CSV_URL, GSHEET_PUBLIC_URL, or GSHEET_SERVICE_ACCOUNT_JSON for sheet access."
               )
 
           # Prefer public-sheet mode when public URL is available.
-          if gsheet_public_url:
+          if gsheet_public_csv_url:
+              gsheet_cfg["public_url"] = ""
+          elif gsheet_public_url:
               if not gsheet_spreadsheet_id:
                   match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", gsheet_public_url)
                   if match:

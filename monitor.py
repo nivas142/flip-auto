@@ -409,9 +409,67 @@ def load_public_sheet_rows(sheet_cfg: dict[str, Any]) -> tuple[list[dict[str, An
             raw = response.read()
 
     decoded = raw.decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(decoded))
-    rows: list[dict[str, Any]] = [dict(row) for row in reader]
+    rows = csv_text_to_dict_rows(decoded)
     return rows, csv_url
+
+
+def csv_text_to_dict_rows(decoded: str) -> list[dict[str, Any]]:
+    raw_rows = list(csv.reader(io.StringIO(decoded)))
+    if not raw_rows:
+        return []
+
+    header_index = detect_csv_header_row(raw_rows)
+    headers = make_unique_headers(raw_rows[header_index])
+    rows: list[dict[str, Any]] = []
+    for raw_row in raw_rows[header_index + 1 :]:
+        if not any(normalize_text(cell) for cell in raw_row):
+            continue
+        padded = raw_row + [""] * max(0, len(headers) - len(raw_row))
+        row = {headers[index]: padded[index] for index in range(len(headers))}
+        if any(normalize_text(str(value)) for value in row.values()):
+            rows.append(row)
+    return rows
+
+
+def detect_csv_header_row(raw_rows: list[list[str]]) -> int:
+    best_index = 0
+    best_score = -1
+    header_terms = {
+        "address",
+        "property address",
+        "city",
+        "status",
+        "price",
+        "bed",
+        "beds",
+        "bath",
+        "baths",
+        "sqft",
+        "notes",
+        "link",
+    }
+    for index, row in enumerate(raw_rows[:30]):
+        normalized = {normalize_text(cell).lower() for cell in row if normalize_text(cell)}
+        score = sum(1 for term in header_terms if term in normalized)
+        if "property address" in normalized:
+            score += 3
+        if "address" in normalized:
+            score += 2
+        if score > best_score:
+            best_index = index
+            best_score = score
+    return best_index if best_score > 0 else 0
+
+
+def make_unique_headers(headers: list[str]) -> list[str]:
+    seen: dict[str, int] = {}
+    result: list[str] = []
+    for index, header in enumerate(headers):
+        base = normalize_text(header) or f"column_{index + 1}"
+        count = seen.get(base.lower(), 0)
+        seen[base.lower()] = count + 1
+        result.append(base if count == 0 else f"{base}_{count + 1}")
+    return result
 
 
 def get_row_value(row: dict[str, Any], column_name: str) -> str:
@@ -430,6 +488,31 @@ def get_first_column_value(row: dict[str, Any]) -> str:
         if text:
             return text
     return ""
+
+
+def detect_row_city(row: dict[str, Any], cities: list[str], city_column: str) -> str | None:
+    location_columns = [
+        city_column,
+        "city",
+        "property address",
+        "address",
+        "location",
+    ]
+    checked_columns: set[str] = set()
+    for column in location_columns:
+        column_key = normalize_text(column).lower()
+        if not column_key or column_key in checked_columns:
+            continue
+        checked_columns.add(column_key)
+        value = get_row_value(row, column)
+        if not value:
+            continue
+        city_match = contains_city(value, cities)
+        if city_match:
+            return city_match
+
+    first_column_val = get_first_column_value(row)
+    return contains_city(first_column_val, cities)
 
 
 def row_snippets(row: dict[str, Any], content_columns: list[str]) -> list[str]:
@@ -580,6 +663,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     if not sheet_cfg.get("enabled", False):
         return []
     content_columns = sheet_cfg.get("content_columns", [])
+    city_column = sheet_cfg.get("city_column", "city")
     row_id_column = sheet_cfg.get("row_id_column", "id")
     cities = sheet_cfg.get("cities", [])
     source_key = ""
@@ -633,9 +717,15 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
                 rows = ws.get_all_records()
             source_key = f"{spreadsheet_id}:{worksheet_name}"
         except Exception as exc:
+            hint = ""
+            if exc.__class__.__name__ == "SpreadsheetNotFound":
+                hint = (
+                    " Check GSHEET_SPREADSHEET_ID and share the sheet with the "
+                    "service-account client_email from GSHEET_SERVICE_ACCOUNT_JSON."
+                )
             print(
                 f"[WARN] Google Sheet service-account access failed "
-                f"({exc.__class__.__name__}: {exc}). Continuing without sheet matches.",
+                f"({exc.__class__.__name__}: {exc}).{hint} Continuing without sheet matches.",
                 file=sys.stderr,
             )
             return []
@@ -643,8 +733,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     results: list[AlertItem] = []
 
     for row in rows:
-        first_column_val = get_first_column_value(row)
-        city_match = contains_city(first_column_val, cities)
+        city_match = detect_row_city(row, cities, city_column)
         if not city_match:
             continue
 
