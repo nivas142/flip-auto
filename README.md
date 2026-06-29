@@ -26,8 +26,10 @@ Copy-Item config.example.yaml config.yaml
 
 Edit `config.yaml`:
 - `email.sender_filters` for allowed senders.
+- `email.subject_filters` for subject phrases that must also match when set.
 - `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
 - `email.cities` and `gsheet.cities` for target cities.
+- The default template includes a Flip Auto rule for `listingupdates@flexmail.flexmls.com` with subject `Copy: Subscription Investing`.
 - To monitor more than one mailbox, add entries under `email.accounts`. Each account can use a different IMAP host and folder, while still inheriting the top-level city and sender filters if you leave those fields out.
 - Google Sheet city matching only checks column A of each row.
 - Telegram bot credentials (`telegram.bot_token`, `telegram.chat_id`).

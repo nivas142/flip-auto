@@ -135,6 +135,14 @@ def contains_city(text: str, cities: list[str]) -> str | None:
     return None
 
 
+def matches_any_filter(text: str, filters: list[str]) -> bool:
+    if not filters:
+        return True
+
+    lower_text = text.lower()
+    return any(filter_text in lower_text for filter_text in filters if filter_text)
+
+
 CARTER_SENDER_ALIASES = {
     "deals@carterbuyaz.com",
     "deals@carterbuysaz.com",
@@ -406,6 +414,7 @@ def normalize_email_account(
     label = normalize_text(str(merged.get("label", ""))) or username or fallback_label
     folder = normalize_text(str(merged.get("folder", ""))) or "INBOX"
     sender_filters = normalize_list(merged.get("sender_filters"))
+    subject_filters = normalize_list(merged.get("subject_filters"))
     cities = normalize_list(merged.get("cities"))
 
     lookback_hours = merged.get("lookback_hours")
@@ -425,6 +434,7 @@ def normalize_email_account(
         "folder": folder,
         "lookback_minutes": lookback_minutes,
         "sender_filters": sender_filters,
+        "subject_filters": subject_filters,
         "cities": cities,
     }
 
@@ -626,6 +636,7 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
     folder = account_cfg.get("folder", "INBOX")
     lookback_minutes = int(account_cfg.get("lookback_minutes", 30))
     sender_filters = [s.lower() for s in account_cfg.get("sender_filters", [])]
+    subject_filters = [s.lower() for s in account_cfg.get("subject_filters", [])]
     cities = account_cfg.get("cities", [])
     label = account_cfg.get("label") or username or host
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
@@ -657,7 +668,11 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
                 continue
 
             from_header = normalize_text(header_msg.get("From", ""))
-            if sender_filters and not any(sender in from_header.lower() for sender in sender_filters):
+            if not matches_any_filter(from_header, sender_filters):
+                continue
+
+            subject = normalize_text(parse_email_subject(header_msg))
+            if not matches_any_filter(subject, subject_filters):
                 continue
 
             status, data = mail.fetch(msg_id, "(BODY.PEEK[])")
@@ -671,7 +686,6 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
             # Explicitly mark only configured-sender messages as read.
             mail.store(msg_id, "+FLAGS", "\\Seen")
 
-            subject = normalize_text(parse_email_subject(msg))
             received_at = parse_email_timestamp(msg)
             body = parse_email_body(msg)
             city, parsed_deals = detect_email_city(msg, from_header, subject, body, cities)
