@@ -28,6 +28,7 @@ Edit `config.yaml`:
 - `email.sender_filters` for allowed senders.
 - `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
 - `email.cities` and `gsheet.cities` for target cities.
+- To monitor more than one mailbox, add entries under `email.accounts`. Each account can use a different IMAP host and folder, while still inheriting the top-level city and sender filters if you leave those fields out.
 - Google Sheet city matching only checks column A of each row.
 - Telegram bot credentials (`telegram.bot_token`, `telegram.chat_id`).
 - Google Sheet source details (public link or service account).
@@ -82,6 +83,11 @@ Required:
 
 Optional:
 - `EMAIL_LOOKBACK_HOURS` (overrides the template's email lookback window for GitHub Actions runs)
+- `ZOHO_EMAIL_USERNAME`
+- `ZOHO_EMAIL_APP_PASSWORD`
+- `ZOHO_IMAP_HOST` (defaults to `imap.zoho.com`)
+- `ZOHO_FOLDER` (defaults to `Off-Market-Deals`)
+- `ZOHO_LOOKBACK_HOURS` (defaults to the template lookback window when set)
 - `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`

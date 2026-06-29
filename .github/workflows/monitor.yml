@@ -37,6 +37,11 @@ jobs:
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           EMAIL_LOOKBACK_HOURS: ${{ secrets.EMAIL_LOOKBACK_HOURS }}
+          ZOHO_EMAIL_USERNAME: ${{ secrets.ZOHO_EMAIL_USERNAME }}
+          ZOHO_EMAIL_APP_PASSWORD: ${{ secrets.ZOHO_EMAIL_APP_PASSWORD }}
+          ZOHO_IMAP_HOST: ${{ secrets.ZOHO_IMAP_HOST }}
+          ZOHO_FOLDER: ${{ secrets.ZOHO_FOLDER }}
+          ZOHO_LOOKBACK_HOURS: ${{ secrets.ZOHO_LOOKBACK_HOURS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GSHEET_PUBLIC_CSV_URL: ${{ secrets.GSHEET_PUBLIC_CSV_URL }}
@@ -71,6 +76,28 @@ jobs:
           lookback_hours = os.getenv("EMAIL_LOOKBACK_HOURS", "").strip()
           if lookback_hours:
               email_cfg["lookback_hours"] = int(lookback_hours)
+
+          zoho_username = os.getenv("ZOHO_EMAIL_USERNAME", "").strip()
+          zoho_password = os.getenv("ZOHO_EMAIL_APP_PASSWORD", "").strip()
+          if zoho_username and zoho_password:
+              zoho_account = {
+                  "label": "zoho",
+                  "enabled": True,
+                  "imap_host": os.getenv("ZOHO_IMAP_HOST", "").strip() or "imap.zoho.com",
+                  "username": zoho_username,
+                  "password": zoho_password,
+                  "folder": os.getenv("ZOHO_FOLDER", "").strip() or "Off-Market-Deals",
+              }
+              zoho_lookback_hours = os.getenv("ZOHO_LOOKBACK_HOURS", "").strip()
+              if zoho_lookback_hours:
+                  zoho_account["lookback_hours"] = int(zoho_lookback_hours)
+              email_cfg.setdefault("accounts", [])
+              email_cfg["accounts"] = [
+                  account
+                  for account in email_cfg["accounts"]
+                  if account.get("label") != "zoho"
+              ]
+              email_cfg["accounts"].append(zoho_account)
 
           cfg.setdefault("telegram", {})["bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
           cfg.setdefault("telegram", {})["chat_id"] = os.environ["TELEGRAM_CHAT_ID"]

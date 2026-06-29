@@ -28,6 +28,25 @@ email:
     - Queen Creek
     - Flagstaff
     - Mesa
+  # Optional. Add more IMAP mailboxes here. Each account can inherit the
+  # top-level sender_filters/cities unless you override them per account.
+  accounts:
+    - label: zoho
+      enabled: false
+      imap_host: imap.zoho.com
+      username: nivas@homesbynivas.com
+      password: REPLACE_WITH_ZOHO_APP_PASSWORD
+      folder: Off-Market-Deals
+      lookback_hours: 48
+      sender_filters:
+        - deals@exohomesolutions.com
+        - everett.williams-first48offers.com@shared1.ccsend.com
+      cities:
+        - Chandler
+        - Gilbert
+        - Queen Creek
+        - Flagstaff
+        - Mesa
 
 gsheet:
   enabled: true

@@ -376,6 +376,80 @@ def stable_id(parts: list[str]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
+def normalize_list(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [normalize_text(str(item)) for item in value if normalize_text(str(item))]
+    text = normalize_text(str(value))
+    return [text] if text else []
+
+
+def normalize_email_account(
+    raw_cfg: dict[str, Any],
+    defaults: dict[str, Any],
+    *,
+    fallback_label: str,
+) -> dict[str, Any] | None:
+    if not raw_cfg or not raw_cfg.get("enabled", True):
+        return None
+
+    merged: dict[str, Any] = dict(defaults)
+    merged.update(raw_cfg)
+
+    username = normalize_text(str(merged.get("username", "")))
+    password = normalize_text(str(merged.get("password", "")))
+    imap_host = normalize_text(str(merged.get("imap_host", "")))
+    if not username or not password or not imap_host:
+        return None
+
+    label = normalize_text(str(merged.get("label", ""))) or username or fallback_label
+    folder = normalize_text(str(merged.get("folder", ""))) or "INBOX"
+    sender_filters = normalize_list(merged.get("sender_filters"))
+    cities = normalize_list(merged.get("cities"))
+
+    lookback_hours = merged.get("lookback_hours")
+    lookback_minutes = merged.get("lookback_minutes")
+    if lookback_hours is not None:
+        lookback_minutes = int(lookback_hours) * 60
+    elif lookback_minutes is not None:
+        lookback_minutes = int(lookback_minutes)
+    else:
+        lookback_minutes = 30
+
+    return {
+        "label": label,
+        "imap_host": imap_host,
+        "username": username,
+        "password": password,
+        "folder": folder,
+        "lookback_minutes": lookback_minutes,
+        "sender_filters": sender_filters,
+        "cities": cities,
+    }
+
+
+def collect_email_accounts(config: dict[str, Any]) -> list[dict[str, Any]]:
+    email_cfg = config.get("email", {})
+    defaults = {k: v for k, v in email_cfg.items() if k != "accounts"}
+    accounts: list[dict[str, Any]] = []
+
+    top_level = normalize_email_account(defaults, defaults, fallback_label="email")
+    if top_level:
+        accounts.append(top_level)
+
+    for index, raw_account in enumerate(email_cfg.get("accounts") or [], start=1):
+        account = normalize_email_account(
+            raw_account,
+            defaults,
+            fallback_label=f"email-{index}",
+        )
+        if account:
+            accounts.append(account)
+
+    return accounts
+
+
 def build_public_csv_url(sheet_cfg: dict[str, Any]) -> str | None:
     public_csv_url = normalize_text(str(sheet_cfg.get("public_csv_url", "")))
     if public_csv_url:
@@ -545,22 +619,15 @@ def row_snippets(row: dict[str, Any], content_columns: list[str]) -> list[str]:
     return snippets
 
 
-def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
-    email_cfg = config.get("email", {})
-    if not email_cfg.get("enabled", False):
-        return []
-
-    host = email_cfg["imap_host"]
-    username = email_cfg["username"]
-    password = email_cfg["password"]
-    folder = email_cfg.get("folder", "INBOX")
-    lookback_hours = email_cfg.get("lookback_hours")
-    if lookback_hours is not None:
-        lookback_minutes = int(lookback_hours) * 60
-    else:
-        lookback_minutes = int(email_cfg.get("lookback_minutes", 30))
-    sender_filters = [s.lower() for s in email_cfg.get("sender_filters", [])]
-    cities = email_cfg.get("cities", [])
+def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
+    host = account_cfg["imap_host"]
+    username = account_cfg["username"]
+    password = account_cfg["password"]
+    folder = account_cfg.get("folder", "INBOX")
+    lookback_minutes = int(account_cfg.get("lookback_minutes", 30))
+    sender_filters = [s.lower() for s in account_cfg.get("sender_filters", [])]
+    cities = account_cfg.get("cities", [])
+    label = account_cfg.get("label") or username or host
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
 
     results: list[AlertItem] = []
@@ -570,7 +637,7 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
     try:
         status, _ = mail.select(folder)
         if status != "OK":
-            raise RuntimeError(f"Could not select folder '{folder}'")
+            raise RuntimeError(f"Could not select folder '{folder}' for {label}")
 
         since_date = cutoff_dt.strftime("%d-%b-%Y")
         status, msg_ids = mail.search(None, f'(SINCE "{since_date}")')
@@ -614,11 +681,11 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
             city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
 
             msg_key = msg.get("Message-ID", "") or str(msg_id, errors="ignore")
-            item_id = stable_id(["email", msg_key, subject, city])
+            item_id = stable_id(["email", label, msg_key, subject, city])
 
             title = f"Email match: {city}"
             if city_deals:
-                lines = [f"From: {from_header}", f"Subject: {subject}"]
+                lines = [f"Mailbox: {label}", f"From: {from_header}", f"Subject: {subject}"]
                 if received_at:
                     lines.append(f"Received: {received_at}")
                 lines.append("Deals:")
@@ -637,11 +704,11 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
             else:
                 preview = normalize_text(body)[:500]
                 timestamp_line = f"\nReceived: {received_at}" if received_at else ""
-                content = f"From: {from_header}\nSubject: {subject}{timestamp_line}\n{preview}"
+                content = f"Mailbox: {label}\nFrom: {from_header}\nSubject: {subject}{timestamp_line}\n{preview}"
 
             results.append(
                 AlertItem(
-                    source="email",
+                    source=f"email:{label}",
                     item_id=item_id,
                     title=title,
                     body=content,
@@ -655,6 +722,18 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
             pass
         mail.logout()
 
+    return results
+
+
+def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
+    email_cfg = config.get("email", {})
+    results: list[AlertItem] = []
+    accounts = collect_email_accounts(config)
+    if not accounts:
+        return []
+
+    for account_cfg in accounts:
+        results.extend(scan_email_account(account_cfg))
     return results
 
 
