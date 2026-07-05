@@ -642,10 +642,13 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
 
     results: list[AlertItem] = []
+    scanned = 0
+    matched = 0
+    mail = None
 
-    mail = imaplib.IMAP4_SSL(host)
-    mail.login(username, password)
     try:
+        mail = imaplib.IMAP4_SSL(host)
+        mail.login(username, password)
         status, _ = mail.select(folder)
         if status != "OK":
             raise RuntimeError(f"Could not select folder '{folder}' for {label}")
@@ -656,6 +659,7 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
             return []
 
         for msg_id in msg_ids[0].split():
+            scanned += 1
             status, header_data = mail.fetch(msg_id, "(BODY.PEEK[HEADER])")
             if status != "OK" or not header_data:
                 continue
@@ -693,6 +697,7 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
                 continue
 
             city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
+            matched += 1
 
             msg_key = msg.get("Message-ID", "") or str(msg_id, errors="ignore")
             item_id = stable_id(["email", label, msg_key, subject, city])
@@ -729,14 +734,22 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
                     city=city,
                 )
             )
+        return results
     finally:
-        try:
-            mail.close()
-        except Exception:
-            pass
-        mail.logout()
-
-    return results
+        if mail is not None:
+            try:
+                mail.close()
+            except Exception:
+                pass
+            try:
+                mail.logout()
+            except Exception:
+                pass
+        print(
+            f"[INFO] Email account {label} ({host}): scanned {scanned} messages, "
+            f"matched {matched}.",
+            file=sys.stderr,
+        )
 
 
 def scan_emails(config: dict[str, Any]) -> list[AlertItem]:

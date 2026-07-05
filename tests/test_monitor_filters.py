@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import imaplib
 import unittest
 from datetime import datetime, timezone
@@ -75,12 +76,17 @@ class MonitorFilterTests(unittest.TestCase):
             "cities": ["Chandler"],
         }
 
-        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap):
+        stderr = io.StringIO()
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch(
+            "sys.stderr",
+            stderr,
+        ):
             results = monitor.scan_email_account(account_cfg)
 
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].city, "Chandler")
         self.assertEqual(results[0].title, "Email match: Chandler")
+        self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 1.", stderr.getvalue())
 
     def test_nonmatching_subject_is_ignored(self):
         raw_message = build_email_bytes(
@@ -102,12 +108,17 @@ class MonitorFilterTests(unittest.TestCase):
             "cities": ["Chandler"],
         }
 
-        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap):
+        stderr = io.StringIO()
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch(
+            "sys.stderr",
+            stderr,
+        ):
             results = monitor.scan_email_account(account_cfg)
 
         self.assertEqual(results, [])
         fetch_queries = [call[1][1] for call in fake_imap.calls if call[0] == "fetch"]
         self.assertEqual(fetch_queries, ["(BODY.PEEK[HEADER])"])
+        self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 0.", stderr.getvalue())
 
 
 if __name__ == "__main__":
