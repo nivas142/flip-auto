@@ -23,8 +23,10 @@ email:
     - michael@betterhomeofferllc.com
     - dispo@sellwholesalehouses.com
     - listingupdates@flexmail.flexmls.com
-  subject_filters:
-    - Copy: Subscription Investing
+  subject_filters: []
+  sender_subject_filters:
+    listingupdates@flexmail.flexmls.com:
+      - Copy: Subscription Investing
   cities:
     - Chandler
     - Gilbert

@@ -393,6 +393,39 @@ def normalize_list(value: Any) -> list[str]:
     return [text] if text else []
 
 
+def normalize_sender_subject_filters(value: Any) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        return {}
+
+    result: dict[str, list[str]] = {}
+    for sender, filters in value.items():
+        sender_key = normalize_text(str(sender))
+        normalized_filters = normalize_list(filters)
+        if sender_key and normalized_filters:
+            result[sender_key] = normalized_filters
+    return result
+
+
+def matches_sender_subject_filters(
+    from_header: str,
+    subject: str,
+    sender_subject_filters: dict[str, list[str]],
+) -> bool:
+    if not sender_subject_filters:
+        return True
+
+    lower_from = from_header.lower()
+    lower_subject = subject.lower()
+    for sender_filter, subject_filters in sender_subject_filters.items():
+        if sender_filter.lower() not in lower_from:
+            continue
+        return matches_any_filter(
+            lower_subject,
+            [subject_filter.lower() for subject_filter in subject_filters],
+        )
+    return True
+
+
 def normalize_email_account(
     raw_cfg: dict[str, Any],
     defaults: dict[str, Any],
@@ -415,6 +448,7 @@ def normalize_email_account(
     folder = normalize_text(str(merged.get("folder", ""))) or "INBOX"
     sender_filters = normalize_list(merged.get("sender_filters"))
     subject_filters = normalize_list(merged.get("subject_filters"))
+    sender_subject_filters = normalize_sender_subject_filters(merged.get("sender_subject_filters"))
     cities = normalize_list(merged.get("cities"))
 
     lookback_hours = merged.get("lookback_hours")
@@ -435,6 +469,7 @@ def normalize_email_account(
         "lookback_minutes": lookback_minutes,
         "sender_filters": sender_filters,
         "subject_filters": subject_filters,
+        "sender_subject_filters": sender_subject_filters,
         "cities": cities,
     }
 
@@ -637,6 +672,7 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
     lookback_minutes = int(account_cfg.get("lookback_minutes", 30))
     sender_filters = [s.lower() for s in account_cfg.get("sender_filters", [])]
     subject_filters = [s.lower() for s in account_cfg.get("subject_filters", [])]
+    sender_subject_filters = account_cfg.get("sender_subject_filters", {})
     cities = account_cfg.get("cities", [])
     label = account_cfg.get("label") or username or host
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
@@ -677,6 +713,8 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
 
             subject = normalize_text(parse_email_subject(header_msg))
             if not matches_any_filter(subject, subject_filters):
+                continue
+            if not matches_sender_subject_filters(from_header, subject, sender_subject_filters):
                 continue
 
             status, data = mail.fetch(msg_id, "(BODY.PEEK[])")

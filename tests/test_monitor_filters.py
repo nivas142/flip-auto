@@ -86,6 +86,7 @@ class MonitorFilterTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].city, "Chandler")
         self.assertEqual(results[0].title, "Email match: Chandler")
+        self.assertIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
         self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 1.", stderr.getvalue())
 
     def test_nonmatching_subject_is_ignored(self):
@@ -118,6 +119,83 @@ class MonitorFilterTests(unittest.TestCase):
         self.assertEqual(results, [])
         fetch_queries = [call[1][1] for call in fake_imap.calls if call[0] == "fetch"]
         self.assertEqual(fetch_queries, ["(BODY.PEEK[HEADER])"])
+        self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 0.", stderr.getvalue())
+
+    def test_sender_specific_subject_filter_allows_other_senders(self):
+        raw_message = build_email_bytes(
+            from_addr="Deals <deals@exohomesolutions.com>",
+            subject="New Chandler property",
+            body="Chandler deal details inside.",
+        )
+        fake_imap = FakeIMAP(raw_message)
+
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": [
+                "deals@exohomesolutions.com",
+                "listingupdates@flexmail.flexmls.com",
+            ],
+            "subject_filters": [],
+            "sender_subject_filters": {
+                "listingupdates@flexmail.flexmls.com": ["Copy: Subscription Investing"],
+            },
+            "cities": ["Chandler"],
+        }
+
+        stderr = io.StringIO()
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch(
+            "sys.stderr",
+            stderr,
+        ):
+            results = monitor.scan_email_account(account_cfg)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].city, "Chandler")
+        self.assertIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
+        self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 1.", stderr.getvalue())
+
+    def test_sender_specific_subject_filter_blocks_configured_sender_only(self):
+        raw_message = build_email_bytes(
+            from_addr="Listing Updates <listingupdates@flexmail.flexmls.com>",
+            subject="Copy: Something Else",
+            body="Chandler deal details inside.",
+        )
+        fake_imap = FakeIMAP(raw_message)
+
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": [
+                "deals@exohomesolutions.com",
+                "listingupdates@flexmail.flexmls.com",
+            ],
+            "subject_filters": [],
+            "sender_subject_filters": {
+                "listingupdates@flexmail.flexmls.com": ["Copy: Subscription Investing"],
+            },
+            "cities": ["Chandler"],
+        }
+
+        stderr = io.StringIO()
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch(
+            "sys.stderr",
+            stderr,
+        ):
+            results = monitor.scan_email_account(account_cfg)
+
+        self.assertEqual(results, [])
+        fetch_queries = [call[1][1] for call in fake_imap.calls if call[0] == "fetch"]
+        self.assertEqual(fetch_queries, ["(BODY.PEEK[HEADER])"])
+        self.assertNotIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
         self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 0.", stderr.getvalue())
 
 
