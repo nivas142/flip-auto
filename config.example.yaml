@@ -33,6 +33,7 @@ email:
     - Queen Creek
     - Flagstaff
     - Mesa
+    - Sedona
   # Optional. Add more IMAP mailboxes here. Each account can inherit the
   # top-level sender_filters/cities unless you override them per account.
   accounts:
@@ -52,6 +53,7 @@ email:
         - Queen Creek
         - Flagstaff
         - Mesa
+        - Sedona
 
 gsheet:
   enabled: true
@@ -76,6 +78,7 @@ gsheet:
     - Queen Creek
     - Flagstaff
     - Mesa
+    - Sedona
 
 telegram:
   enabled: true
