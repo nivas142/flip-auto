@@ -143,9 +143,10 @@ def matches_any_filter(text: str, filters: list[str]) -> bool:
     return any(filter_text in lower_text for filter_text in filters if filter_text)
 
 
-CARTER_SENDER_ALIASES = {
+FOOTER_CITY_SENDER_ALIASES = {
     "deals@carterbuyaz.com",
     "deals@carterbuysaz.com",
+    "dispo@sellwholesalehouses.com",
 }
 
 
@@ -153,9 +154,9 @@ def detect_email_city(msg: Message, from_header: str, subject: str, body: str, c
     parsed_deals = extract_property_deals_from_email(msg, cities)
     sender = from_header.lower()
 
-    # Carter emails include city names in the footer; restrict matching to the
-    # subject line and extracted property deals to avoid footer-only alerts.
-    if any(alias in sender for alias in CARTER_SENDER_ALIASES):
+    # Some marketing emails include city names in footers or physical mailing
+    # addresses; restrict those senders to subject and extracted deal data.
+    if any(alias in sender for alias in FOOTER_CITY_SENDER_ALIASES):
         city = contains_city(subject, cities)
         if city:
             return city, parsed_deals

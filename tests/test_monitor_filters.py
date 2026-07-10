@@ -232,6 +232,43 @@ class MonitorFilterTests(unittest.TestCase):
         self.assertNotIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
         self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 0.", stderr.getvalue())
 
+    def test_sellwholesalehouses_footer_city_does_not_alert(self):
+        raw_message = build_email_bytes(
+            from_addr="Dispo <dispo@sellwholesalehouses.com>",
+            subject="New wholesale opportunity",
+            body=(
+                "Property details do not include a monitored city.\n\n"
+                "Company footer\n"
+                "123 Example Rd, Chandler, AZ 85225\n"
+                "Unsubscribe from this list"
+            ),
+        )
+        fake_imap = FakeIMAP(raw_message)
+
+        account_cfg = {
+            "label": "zoho",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "Off-Market-Deals",
+            "lookback_minutes": 60,
+            "sender_filters": [],
+            "subject_filters": [],
+            "sender_subject_filters": {},
+            "cities": ["Chandler"],
+        }
+
+        stderr = io.StringIO()
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch(
+            "sys.stderr",
+            stderr,
+        ):
+            results = monitor.scan_email_account(account_cfg)
+
+        self.assertEqual(results, [])
+        self.assertIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
+        self.assertIn("Email account zoho (imap.example.com): scanned 1 messages, matched 0.", stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
