@@ -87,6 +87,9 @@ jobs:
                   "username": zoho_username,
                   "password": zoho_password,
                   "folder": os.getenv("ZOHO_FOLDER", "").strip() or "Off-Market-Deals",
+                  "sender_filters": [],
+                  "subject_filters": [],
+                  "sender_subject_filters": {},
               }
               zoho_lookback_hours = os.getenv("ZOHO_LOOKBACK_HOURS", "").strip()
               if zoho_lookback_hours:

@@ -56,6 +56,40 @@ class FakeIMAP:
 
 
 class MonitorFilterTests(unittest.TestCase):
+    def test_account_can_clear_inherited_email_filters(self):
+        config = {
+            "email": {
+                "imap_host": "imap.example.com",
+                "username": "default@example.com",
+                "password": "secret",
+                "sender_filters": ["listingupdates@flexmail.flexmls.com"],
+                "subject_filters": ["Copy: Subscription Investing"],
+                "sender_subject_filters": {
+                    "listingupdates@flexmail.flexmls.com": ["Copy: Subscription Investing"],
+                },
+                "cities": ["Chandler"],
+                "accounts": [
+                    {
+                        "label": "zoho",
+                        "imap_host": "imap.zoho.com",
+                        "username": "zoho@example.com",
+                        "password": "secret",
+                        "sender_filters": [],
+                        "subject_filters": [],
+                        "sender_subject_filters": {},
+                    }
+                ],
+            }
+        }
+
+        accounts = monitor.collect_email_accounts(config)
+        zoho = next(account for account in accounts if account["label"] == "zoho")
+
+        self.assertEqual(zoho["sender_filters"], [])
+        self.assertEqual(zoho["subject_filters"], [])
+        self.assertEqual(zoho["sender_subject_filters"], {})
+        self.assertEqual(zoho["cities"], ["Chandler"])
+
     def test_sender_and_subject_must_both_match(self):
         raw_message = build_email_bytes(
             from_addr="Listing Updates <listingupdates@flexmail.flexmls.com>",
