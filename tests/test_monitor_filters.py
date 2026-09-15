@@ -9,6 +9,7 @@ from email.utils import format_datetime
 from unittest.mock import patch
 
 import monitor
+from valuation import ValuationResult
 
 
 def build_email_bytes(*, from_addr: str, subject: str, body: str) -> bytes:
@@ -94,8 +95,24 @@ class MonitorFilterTests(unittest.TestCase):
             "cities": ["Chandler", "Mesa"],
         }
 
-        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap):
-            results = monitor.scan_email_account(account_cfg, {"enabled": True})
+        independent = ValuationResult(
+            status="complete",
+            source="test_comps",
+            arv_low=500_000,
+            arv_likely=515_000,
+            arv_high=530_000,
+            confidence="medium",
+            subject_square_footage=1_800,
+            comparables=(),
+        )
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
+            monitor, "fetch_independent_valuation", return_value=independent
+        ):
+            results = monitor.scan_email_account(
+                account_cfg,
+                {"enabled": True},
+                {"enabled": True, "api_key": "test"},
+            )
 
         self.assertEqual(len(results), 2)
         self.assertEqual({item.city for item in results}, {"Mesa", "Chandler"})

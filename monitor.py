@@ -40,6 +40,7 @@ from deal_screening import (
     normalize_address_key,
     screen_deal,
 )
+from valuation import ValuationResult, fetch_independent_valuation
 
 
 UTC = timezone.utc
@@ -680,6 +681,7 @@ def build_deal_alert(
     subject: str,
     received_at: str,
     screening_cfg: dict[str, Any],
+    valuation: ValuationResult | None = None,
 ) -> AlertItem:
     facts = extract_deal_facts(
         address=deal.address,
@@ -687,7 +689,7 @@ def build_deal_alert(
         price=deal.price,
         summary=deal.summary,
     )
-    screening = screen_deal(facts, screening_cfg)
+    screening = screen_deal(facts, valuation, screening_cfg)
     lines = [f"Mailbox: {label}", f"From: {from_header}", f"Subject: {subject}"]
     if received_at:
         lines.append(f"Received: {received_at}")
@@ -704,8 +706,7 @@ def build_deal_alert(
 
     # Property + ask dedupes the same lead across different wholesalers while
     # allowing a materially changed asking price to generate a new alert.
-    normalized_ask = str(facts.ask or deal.price).strip().lower()
-    item_id = stable_id(["deal", normalize_address_key(deal.address), normalized_ask])
+    item_id = deal_item_id(deal)
     return AlertItem(
         source=f"email:{label}",
         item_id=item_id,
@@ -715,9 +716,23 @@ def build_deal_alert(
     )
 
 
+def deal_item_id(deal: PropertyDeal) -> str:
+    facts = extract_deal_facts(
+        address=deal.address,
+        city=deal.city,
+        price=deal.price,
+        summary=deal.summary,
+    )
+    normalized_ask = str(facts.ask or deal.price).strip().lower()
+    return stable_id(["deal", normalize_address_key(deal.address), normalized_ask])
+
+
 def scan_email_account(
     account_cfg: dict[str, Any],
     screening_cfg: dict[str, Any] | None = None,
+    valuation_cfg: dict[str, Any] | None = None,
+    valuation_cache: dict[str, ValuationResult] | None = None,
+    seen: set[str] | None = None,
 ) -> list[AlertItem]:
     host = account_cfg["imap_host"]
     username = account_cfg["username"]
@@ -730,7 +745,11 @@ def scan_email_account(
     cities = account_cfg.get("cities", [])
     label = account_cfg.get("label") or username or host
     screening_cfg = screening_cfg or {}
-    screening_enabled = bool(screening_cfg.get("enabled", True))
+    valuation_cfg = valuation_cfg or {}
+    valuation_cache = valuation_cache if valuation_cache is not None else {}
+    seen = seen or set()
+    valuation_enabled = bool(valuation_cfg.get("enabled", False))
+    screening_enabled = bool(screening_cfg.get("enabled", valuation_enabled))
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
 
     results: list[AlertItem] = []
@@ -792,8 +811,34 @@ def scan_email_account(
 
             matched += 1
 
-            if screening_enabled and parsed_deals:
+            if screening_enabled and valuation_enabled and parsed_deals:
                 for deal in parsed_deals:
+                    item_id = deal_item_id(deal)
+                    if item_id in seen:
+                        continue
+                    address_key = normalize_address_key(deal.address)
+                    valuation = valuation_cache.get(address_key)
+                    if valuation is None:
+                        try:
+                            valuation = fetch_independent_valuation(deal.address, valuation_cfg)
+                        except Exception as exc:
+                            print(
+                                f"[WARN] Independent valuation failed for {deal.address} "
+                                f"({exc.__class__.__name__}: {exc}).",
+                                file=sys.stderr,
+                            )
+                            valuation = ValuationResult(
+                                status="unavailable",
+                                source="rentcast_comps",
+                                arv_low=None,
+                                arv_likely=None,
+                                arv_high=None,
+                                confidence="insufficient",
+                                subject_square_footage=None,
+                                comparables=(),
+                                reason=str(exc),
+                            )
+                        valuation_cache[address_key] = valuation
                     results.append(
                         build_deal_alert(
                             deal=deal,
@@ -802,6 +847,7 @@ def scan_email_account(
                             subject=subject,
                             received_at=received_at,
                             screening_cfg=screening_cfg,
+                            valuation=valuation,
                         )
                     )
                 continue
@@ -861,7 +907,7 @@ def scan_email_account(
         )
 
 
-def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
+def scan_emails(config: dict[str, Any], seen: set[str] | None = None) -> list[AlertItem]:
     email_cfg = config.get("email", {})
     results: list[AlertItem] = []
     accounts = collect_email_accounts(config)
@@ -869,8 +915,18 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
         return []
 
     screening_cfg = config.get("screening", {})
+    valuation_cfg = config.get("valuation", {})
+    valuation_cache: dict[str, ValuationResult] = {}
     for account_cfg in accounts:
-        results.extend(scan_email_account(account_cfg, screening_cfg))
+        results.extend(
+            scan_email_account(
+                account_cfg,
+                screening_cfg,
+                valuation_cfg,
+                valuation_cache,
+                seen,
+            )
+        )
     return results
 
 
@@ -1064,7 +1120,7 @@ def main() -> int:
 
     matches: list[AlertItem] = []
     try:
-        matches.extend(scan_emails(config))
+        matches.extend(scan_emails(config, seen))
     except Exception as exc:
         print(
             f"[WARN] Email scan failed ({exc.__class__.__name__}: {exc}). Continuing.",

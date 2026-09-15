@@ -1,8 +1,7 @@
 """Pure, side-effect-free first-pass underwriting for wholesale deal alerts.
 
-The calculations in this module intentionally treat a sender-provided ARV as
-unverified.  They prioritize which leads deserve a CMA; they do not approve a
-purchase or represent an appraisal.
+Sender-provided ARV is intentionally ignored. The calculations only accept an
+independent comp valuation produced by the valuation module.
 """
 
 from __future__ import annotations
@@ -11,6 +10,8 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
+
+from valuation import ValuationResult
 
 
 MONEY_TOKEN_RE = r"\$?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?\s*[kKmM]?"
@@ -21,7 +22,6 @@ class DealFacts:
     address: str
     city: str
     ask: int | None
-    claimed_arv: int | None
     explicit_rehab: int | None
     sqft: int | None
     beds: float | None
@@ -37,7 +37,11 @@ class ScreeningResult:
     score: int | None
     confidence: str
     ask: int | None
-    claimed_arv: int | None
+    arv_low: int | None
+    arv_likely: int | None
+    arv_high: int | None
+    valuation_source: str
+    comp_count: int
     rehab: int | None
     rehab_is_assumed: bool
     selling_costs: int | None
@@ -134,7 +138,6 @@ def normalize_address_key(address: str) -> str:
 def extract_deal_facts(*, address: str, city: str, price: str, summary: str) -> DealFacts:
     text = " ".join((summary or "").split())
     ask = parse_money(price) or _labeled_money(("all-in price", "wholesale price", "asking price", "price"), text)
-    claimed_arv = _labeled_money(("arv", "after repair value"), text)
     explicit_rehab = _labeled_money(("rehab", "repairs", "renovation"), text)
     sqft = _first_number(
         (
@@ -154,7 +157,6 @@ def extract_deal_facts(*, address: str, city: str, price: str, summary: str) -> 
         address=address,
         city=city,
         ask=ask,
-        claimed_arv=claimed_arv,
         explicit_rehab=explicit_rehab,
         sqft=int(sqft) if sqft is not None else None,
         beds=float(beds) if beds is not None else None,
@@ -171,13 +173,17 @@ def merged_screening_config(raw_config: dict[str, Any] | None) -> dict[str, Any]
     return result
 
 
-def screen_deal(facts: DealFacts, raw_config: dict[str, Any] | None = None) -> ScreeningResult:
+def screen_deal(
+    facts: DealFacts,
+    valuation: ValuationResult | None = None,
+    raw_config: dict[str, Any] | None = None,
+) -> ScreeningResult:
     config = merged_screening_config(raw_config)
     missing: list[str] = []
     if facts.ask is None:
         missing.append("ask")
-    if facts.claimed_arv is None:
-        missing.append("claimed ARV")
+    if valuation is None or valuation.status != "complete" or valuation.arv_low is None:
+        missing.append("independent comp ARV")
 
     rehab_is_assumed = facts.explicit_rehab is None
     if facts.explicit_rehab is not None:
@@ -189,12 +195,16 @@ def screen_deal(facts: DealFacts, raw_config: dict[str, Any] | None = None) -> S
 
     if missing:
         return ScreeningResult(
-            status="incomplete",
-            label="⚪ NEEDS DATA",
+            status="valuation_required",
+            label="⚪ VALUATION REQUIRED",
             score=None,
             confidence="insufficient",
             ask=facts.ask,
-            claimed_arv=facts.claimed_arv,
+            arv_low=valuation.arv_low if valuation else None,
+            arv_likely=valuation.arv_likely if valuation else None,
+            arv_high=valuation.arv_high if valuation else None,
+            valuation_source=valuation.source if valuation else "none",
+            comp_count=len(valuation.comparables) if valuation else 0,
             rehab=rehab,
             rehab_is_assumed=rehab_is_assumed,
             selling_costs=None,
@@ -206,14 +216,17 @@ def screen_deal(facts: DealFacts, raw_config: dict[str, Any] | None = None) -> S
             missing_fields=tuple(missing),
         )
 
-    assert facts.ask is not None and facts.claimed_arv is not None
-    selling_costs = int(round(facts.claimed_arv * float(config["selling_cost_percent"])))
+    assert facts.ask is not None and valuation is not None and valuation.arv_low is not None
+    # Use the lower end of our independent comp range for automated screening.
+    # The likely/high values remain visible for human review.
+    underwritten_arv = valuation.arv_low
+    selling_costs = int(round(underwritten_arv * float(config["selling_cost_percent"])))
     other_costs = int(config["other_costs"])
     target_profit = int(config["target_profit"])
     max_basis = float(config["max_basis_percent"])
-    projected_profit = facts.claimed_arv - facts.ask - rehab - selling_costs - other_costs
-    basis_percent = (facts.ask + rehab) / facts.claimed_arv
-    mao = facts.claimed_arv - rehab - selling_costs - other_costs - target_profit
+    projected_profit = underwritten_arv - facts.ask - rehab - selling_costs - other_costs
+    basis_percent = (facts.ask + rehab) / underwritten_arv
+    mao = underwritten_arv - rehab - selling_costs - other_costs - target_profit
 
     profit_points = max(0.0, min(40.0, 40.0 * projected_profit / max(target_profit, 1)))
     basis_room = (0.95 - basis_percent) / max(0.95 - max_basis, 0.01)
@@ -225,8 +238,8 @@ def screen_deal(facts: DealFacts, raw_config: dict[str, Any] | None = None) -> S
     completeness_points += 2.0 if facts.year_built else 0.0
     risk_penalty = min(20.0, len(facts.risk_flags) * 7.0)
 
-    # Sender-provided ARV has not been independently verified, so the engine
-    # cannot promote a lead into the 85+ "immediate" tier on its own.
+    # Public-data comps still lack ARMLS photos/concessions and a renovation
+    # condition review, so they cannot promote a lead into the 85+ tier alone.
     score = min(84, max(0, int(round(profit_points + basis_points + completeness_points - risk_penalty))))
     high_risk = bool(set(facts.risk_flags) & HIGH_RISK_FLAGS)
     strong_economics = projected_profit >= target_profit and basis_percent <= max_basis
@@ -241,9 +254,9 @@ def screen_deal(facts: DealFacts, raw_config: dict[str, Any] | None = None) -> S
 
     complete_count = sum(
         value is not None
-        for value in (facts.ask, facts.claimed_arv, facts.sqft, facts.beds, facts.baths, facts.year_built)
+        for value in (facts.ask, facts.sqft, facts.beds, facts.baths, facts.year_built)
     )
-    confidence = "medium" if complete_count >= 5 and not rehab_is_assumed else "low"
+    confidence = valuation.confidence if complete_count >= 4 and not rehab_is_assumed else "low"
 
     return ScreeningResult(
         status=status,
@@ -251,7 +264,11 @@ def screen_deal(facts: DealFacts, raw_config: dict[str, Any] | None = None) -> S
         score=score,
         confidence=confidence,
         ask=facts.ask,
-        claimed_arv=facts.claimed_arv,
+        arv_low=valuation.arv_low,
+        arv_likely=valuation.arv_likely,
+        arv_high=valuation.arv_high,
+        valuation_source=valuation.source,
+        comp_count=len(valuation.comparables),
         rehab=rehab,
         rehab_is_assumed=rehab_is_assumed,
         selling_costs=selling_costs,
@@ -272,16 +289,23 @@ def format_screening_result(result: ScreeningResult) -> str:
     lines = [f"Screen: {result.label}"]
     if result.score is not None:
         lines.append(f"Pre-screen score: {result.score}/100 ({result.confidence} confidence)")
-    lines.append(f"Wholesaler-claimed ARV: {format_money(result.claimed_arv)} (UNVERIFIED)")
+    if result.arv_low is not None:
+        lines.append(
+            "Independent comp ARV: "
+            f"{format_money(result.arv_low)}–{format_money(result.arv_high)} "
+            f"(likely {format_money(result.arv_likely)})"
+        )
+        lines.append(f"Underwritten ARV: {format_money(result.arv_low)}")
+        lines.append(f"Comps used: {result.comp_count} | Source: {result.valuation_source}")
     rehab_suffix = " (assumed)" if result.rehab_is_assumed else " (provided)"
     lines.append(f"Rehab allowance: {format_money(result.rehab)}{rehab_suffix}")
     if result.projected_profit is not None:
         lines.append(f"Preliminary profit: {format_money(result.projected_profit)}")
-        lines.append(f"Purchase + rehab / claimed ARV: {result.basis_percent:.1%}")
+        lines.append(f"Purchase + rehab / underwritten ARV: {result.basis_percent:.1%}")
         lines.append(f"Target MAO: {format_money(result.mao)}")
     if result.risk_flags:
         lines.append(f"Risk flags: {', '.join(result.risk_flags)}")
     if result.missing_fields:
         lines.append(f"Missing: {', '.join(result.missing_fields)}")
-    lines.append("Next step: Verify ARV with ARMLS before making an offer")
+    lines.append("Next step: Verify condition and final ARV with ARMLS before making an offer")
     return "\n".join(lines)
