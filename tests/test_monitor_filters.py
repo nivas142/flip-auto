@@ -22,6 +22,18 @@ def build_email_bytes(*, from_addr: str, subject: str, body: str) -> bytes:
     return msg.as_bytes()
 
 
+def build_html_email_bytes(*, from_addr: str, subject: str, html: str) -> bytes:
+    msg = EmailMessage()
+    msg["From"] = from_addr
+    msg["To"] = "nobody@example.com"
+    msg["Subject"] = subject
+    msg["Date"] = format_datetime(datetime.now(timezone.utc))
+    msg["Message-ID"] = "<test-html-message@example.com>"
+    msg.set_content("HTML deal email")
+    msg.add_alternative(html, subtype="html")
+    return msg.as_bytes()
+
+
 class FakeIMAP:
     def __init__(self, raw_message: bytes):
         self.raw_message = raw_message
@@ -56,6 +68,75 @@ class FakeIMAP:
 
 
 class MonitorFilterTests(unittest.TestCase):
+    def test_screening_emits_each_matching_city_deal(self):
+        raw_message = build_html_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New Arizona deals",
+            html="""
+                <table>
+                  <tr><td>123 Main St, Mesa, AZ 85201 ARV: $500K Price: $325,000
+                    <a href="https://example.com/mesa">Photos / Details</a></td></tr>
+                  <tr><td>456 Oak Rd, Chandler, AZ 85224 ARV: $600K Price: $400,000
+                    <a href="https://example.com/chandler">Photos / Details</a></td></tr>
+                </table>
+            """,
+        )
+        fake_imap = FakeIMAP(raw_message)
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": ["deals@example.com"],
+            "subject_filters": [],
+            "cities": ["Chandler", "Mesa"],
+        }
+
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap):
+            results = monitor.scan_email_account(account_cfg, {"enabled": True})
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual({item.city for item in results}, {"Mesa", "Chandler"})
+
+    def test_structured_deal_id_dedupes_address_variants_across_sources(self):
+        first = monitor.PropertyDeal(
+            city="Mesa",
+            address="3462 E Hearn Road, Mesa, AZ 85205",
+            price="$300,000",
+            details_url="",
+            image_url="",
+            summary="1,800 SF ARV: $475,000",
+        )
+        second = monitor.PropertyDeal(
+            city="Mesa",
+            address="3462 E. Hearn Rd Mesa AZ 85205",
+            price="$300,000",
+            details_url="",
+            image_url="",
+            summary="1,800 SF ARV: $475K",
+        )
+
+        first_alert = monitor.build_deal_alert(
+            deal=first,
+            label="gmail",
+            from_header="first@example.com",
+            subject="Deal one",
+            received_at="",
+            screening_cfg={"enabled": True},
+        )
+        second_alert = monitor.build_deal_alert(
+            deal=second,
+            label="zoho",
+            from_header="second@example.com",
+            subject="Deal two",
+            received_at="",
+            screening_cfg={"enabled": True},
+        )
+
+        self.assertEqual(first_alert.item_id, second_alert.item_id)
+
     def test_account_can_clear_inherited_email_filters(self):
         config = {
             "email": {

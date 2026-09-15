@@ -34,6 +34,13 @@ import imaplib
 import yaml
 from bs4 import BeautifulSoup
 
+from deal_screening import (
+    extract_deal_facts,
+    format_screening_result,
+    normalize_address_key,
+    screen_deal,
+)
+
 
 UTC = timezone.utc
 PROXY_ENV_KEYS = (
@@ -665,7 +672,53 @@ def row_snippets(row: dict[str, Any], content_columns: list[str]) -> list[str]:
     return snippets
 
 
-def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
+def build_deal_alert(
+    *,
+    deal: PropertyDeal,
+    label: str,
+    from_header: str,
+    subject: str,
+    received_at: str,
+    screening_cfg: dict[str, Any],
+) -> AlertItem:
+    facts = extract_deal_facts(
+        address=deal.address,
+        city=deal.city,
+        price=deal.price,
+        summary=deal.summary,
+    )
+    screening = screen_deal(facts, screening_cfg)
+    lines = [f"Mailbox: {label}", f"From: {from_header}", f"Subject: {subject}"]
+    if received_at:
+        lines.append(f"Received: {received_at}")
+    lines.append(f"Address: {deal.address}")
+    if deal.price:
+        lines.append(f"Ask: {deal.price}")
+    lines.append(format_screening_result(screening))
+    if deal.details_url:
+        lines.append(f"Details: {deal.details_url}")
+    if deal.image_url:
+        lines.append(f"Image: {deal.image_url}")
+    if deal.summary:
+        lines.append(f"Info: {deal.summary[:260]}")
+
+    # Property + ask dedupes the same lead across different wholesalers while
+    # allowing a materially changed asking price to generate a new alert.
+    normalized_ask = str(facts.ask or deal.price).strip().lower()
+    item_id = stable_id(["deal", normalize_address_key(deal.address), normalized_ask])
+    return AlertItem(
+        source=f"email:{label}",
+        item_id=item_id,
+        title=f"{screening.label}: {deal.city}",
+        body="\n".join(lines),
+        city=deal.city,
+    )
+
+
+def scan_email_account(
+    account_cfg: dict[str, Any],
+    screening_cfg: dict[str, Any] | None = None,
+) -> list[AlertItem]:
     host = account_cfg["imap_host"]
     username = account_cfg["username"]
     password = account_cfg["password"]
@@ -676,6 +729,8 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
     sender_subject_filters = account_cfg.get("sender_subject_filters", {})
     cities = account_cfg.get("cities", [])
     label = account_cfg.get("label") or username or host
+    screening_cfg = screening_cfg or {}
+    screening_enabled = bool(screening_cfg.get("enabled", True))
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
 
     results: list[AlertItem] = []
@@ -735,8 +790,23 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
             if not city:
                 continue
 
-            city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
             matched += 1
+
+            if screening_enabled and parsed_deals:
+                for deal in parsed_deals:
+                    results.append(
+                        build_deal_alert(
+                            deal=deal,
+                            label=label,
+                            from_header=from_header,
+                            subject=subject,
+                            received_at=received_at,
+                            screening_cfg=screening_cfg,
+                        )
+                    )
+                continue
+
+            city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
 
             msg_key = msg.get("Message-ID", "") or str(msg_id, errors="ignore")
             item_id = stable_id(["email", label, msg_key, subject, city])
@@ -798,8 +868,9 @@ def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
     if not accounts:
         return []
 
+    screening_cfg = config.get("screening", {})
     for account_cfg in accounts:
-        results.extend(scan_email_account(account_cfg))
+        results.extend(scan_email_account(account_cfg, screening_cfg))
     return results
 
 
@@ -983,7 +1054,8 @@ def main() -> int:
 
     state_path = Path(config.get("state_file", "state/monitor_state.json"))
     state = load_state(state_path)
-    seen = set(state.get("seen", []))
+    seen_order = list(dict.fromkeys(state.get("seen", [])))
+    seen = set(seen_order)
 
     telegram_cfg = config.get("telegram", {})
     twilio_cfg = config.get("twilio", {})
@@ -1015,10 +1087,12 @@ def main() -> int:
             print(f"[DRY RUN] {item.title}\n{item.body}\n")
 
         seen.add(item.item_id)
+        seen_order.append(item.item_id)
         sent += 1
 
     # Keep state bounded.
-    state["seen"] = list(seen)[-100:]
+    max_seen = max(100, int(config.get("state_max_seen", 2000)))
+    state["seen"] = seen_order[-max_seen:]
     save_state(state_path, state)
 
     print(f"Processed {len(matches)} matches, sent {sent} new alerts.")

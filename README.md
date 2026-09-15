@@ -7,6 +7,57 @@ This project includes a Python program (`monitor.py`) that:
 - Checks a Google Sheet for matching city rows.
 - Sends Telegram alerts for new matches (Twilio optional fallback).
 - Stores sent IDs in a local state file to prevent duplicate texts.
+- Extracts ask, claimed ARV, rehab, sqft, beds/baths, year built, and risk flags.
+- Calculates a configurable first-pass profit, basis percentage, MAO, and lead score.
+- Deduplicates structured deals by normalized address and ask across mailboxes/senders.
+
+## Pre-screening engine
+
+Stage-one underwriting is enabled by default and is designed to prioritize
+leads for an ARMLS CMA, not to approve a purchase. An optional `screening`
+section in your private `config.yaml` can override the built-in assumptions:
+
+```yaml
+state_max_seen: 2000
+screening:
+  enabled: true
+  target_profit: 50000
+  selling_cost_percent: 0.07
+  other_costs: 12000
+  max_basis_percent: 0.80
+  default_rehab_per_sqft: 20
+  fallback_rehab: 35000
+```
+
+Important safeguards:
+
+- Sender-provided ARV is displayed as `UNVERIFIED`.
+- A score based only on sender data is capped at 84, below the 85+ immediate tier.
+- Missing ask or claimed ARV produces `NEEDS DATA` rather than a guessed result.
+- Rehab is labeled as provided or assumed. When absent, the engine uses configured
+  dollars per sqft, then a flat fallback when sqft is also missing.
+- Structured multi-property emails produce one alert per matching property, even
+  when the properties are in different configured cities.
+
+Default calculations:
+
+```text
+Preliminary profit = claimed ARV - ask - rehab - selling costs - other costs
+Basis % = (ask + rehab) / claimed ARV
+Target MAO = claimed ARV - rehab - selling costs - other costs - target profit
+```
+
+Tune these settings under `screening`:
+
+- `target_profit`
+- `selling_cost_percent`
+- `other_costs`
+- `max_basis_percent`
+- `default_rehab_per_sqft`
+- `fallback_rehab`
+
+Set `screening.enabled: false` in private config to retain the legacy
+email-level alert format.
 
 ## Setup
 
@@ -25,6 +76,7 @@ Copy-Item config.example.yaml config.yaml
 ```
 
 Edit `config.yaml`:
+- Optional `screening` overrides for stage-one underwriting assumptions and scoring.
 - `email.sender_filters` for allowed senders.
 - `email.subject_filters` for subject phrases that must also match when set.
 - `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
