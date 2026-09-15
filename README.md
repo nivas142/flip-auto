@@ -7,6 +7,77 @@ This project includes a Python program (`monitor.py`) that:
 - Checks a Google Sheet for matching city rows.
 - Sends Telegram alerts for new matches (Twilio optional fallback).
 - Stores sent IDs in a local state file to prevent duplicate texts.
+- Extracts ask, rehab, sqft, beds/baths, year built, and risk flags.
+- Calculates a configurable first-pass profit, basis percentage, MAO, and lead score.
+- Deduplicates structured deals by normalized address and ask across mailboxes/senders.
+
+## Pre-screening engine
+
+Stage-one underwriting activates only when an independent valuation provider is
+configured. It is designed to prioritize leads for an ARMLS CMA, not approve a
+purchase. Sender-provided ARV is never extracted, displayed, or used.
+
+The first provider integration uses RentCast's comparable listings, but ignores
+RentCast's own AVM number. The engine applies its own filters (1 mile, 180 days,
+similar size/year/type and minimum correlation), adjusts each comp to the
+subject's square footage, and calculates weighted low/likely/high ARV estimates.
+The conservative low estimate is used for profit and MAO calculations.
+
+Configure these sections in private `config.yaml`:
+
+```yaml
+state_max_seen: 2000
+valuation:
+  enabled: true
+  provider: rentcast
+  api_key: YOUR_RENTCAST_API_KEY
+  max_radius: 1.0
+  days_old: 180
+  comp_count: 25
+  size_tolerance: 0.20
+  year_tolerance: 10
+  min_correlation: 0.75
+  minimum_comps: 3
+screening:
+  enabled: true
+  target_profit: 50000
+  selling_cost_percent: 0.07
+  other_costs: 12000
+  max_basis_percent: 0.80
+  default_rehab_per_sqft: 20
+  fallback_rehab: 35000
+```
+
+Important safeguards:
+
+- Sender-provided ARV is ignored completely.
+- The provider's AVM estimate is also ignored; only eligible comparable records feed our calculation.
+- Public-data comp scores are capped at 84, below the 85+ immediate tier.
+- Missing ask or independent comp ARV produces `VALUATION REQUIRED` rather than a guessed result.
+- Rehab is labeled as provided or assumed. When absent, the engine uses configured
+  dollars per sqft, then a flat fallback when sqft is also missing.
+- Structured multi-property emails produce one alert per matching property, even
+  when the properties are in different configured cities.
+
+Default calculations:
+
+```text
+Preliminary profit = conservative independent ARV - ask - rehab - selling costs - other costs
+Basis % = (ask + rehab) / conservative independent ARV
+Target MAO = conservative independent ARV - rehab - selling costs - other costs - target profit
+```
+
+Tune these settings under `screening`:
+
+- `target_profit`
+- `selling_cost_percent`
+- `other_costs`
+- `max_basis_percent`
+- `default_rehab_per_sqft`
+- `fallback_rehab`
+
+Set `screening.enabled: false` in private config to retain the legacy
+email-level alert format.
 
 ## Setup
 
@@ -25,6 +96,7 @@ Copy-Item config.example.yaml config.yaml
 ```
 
 Edit `config.yaml`:
+- Optional `screening` overrides for stage-one underwriting assumptions and scoring.
 - `email.sender_filters` for allowed senders.
 - `email.subject_filters` for subject phrases that must also match when set.
 - `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
@@ -90,6 +162,7 @@ Optional:
 - `ZOHO_IMAP_HOST` (defaults to `imap.zoho.com`)
 - `ZOHO_FOLDER` (defaults to `Off-Market-Deals`)
 - `ZOHO_LOOKBACK_HOURS` (defaults to the template lookback window when set)
+- `RENTCAST_API_KEY` (activates independent comp valuation and pre-screening)
 - `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`

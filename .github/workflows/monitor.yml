@@ -44,6 +44,7 @@ jobs:
           ZOHO_LOOKBACK_HOURS: ${{ secrets.ZOHO_LOOKBACK_HOURS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
           GSHEET_PUBLIC_CSV_URL: ${{ secrets.GSHEET_PUBLIC_CSV_URL }}
           GSHEET_PUBLIC_URL: ${{ secrets.GSHEET_PUBLIC_URL }}
           GSHEET_SPREADSHEET_ID: ${{ secrets.GSHEET_SPREADSHEET_ID }}
@@ -104,6 +105,30 @@ jobs:
 
           cfg.setdefault("telegram", {})["bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
           cfg.setdefault("telegram", {})["chat_id"] = os.environ["TELEGRAM_CHAT_ID"]
+
+          rentcast_api_key = os.getenv("RENTCAST_API_KEY", "").strip()
+          if rentcast_api_key:
+              cfg["valuation"] = {
+                  "enabled": True,
+                  "provider": "rentcast",
+                  "api_key": rentcast_api_key,
+                  "max_radius": 1.0,
+                  "days_old": 180,
+                  "comp_count": 25,
+                  "size_tolerance": 0.20,
+                  "year_tolerance": 10,
+                  "min_correlation": 0.75,
+                  "minimum_comps": 3,
+              }
+              cfg["screening"] = {
+                  "enabled": True,
+                  "target_profit": 50000,
+                  "selling_cost_percent": 0.07,
+                  "other_costs": 12000,
+                  "max_basis_percent": 0.80,
+                  "default_rehab_per_sqft": 20,
+                  "fallback_rehab": 35000,
+              }
 
           gsheet_public_csv_url = os.getenv("GSHEET_PUBLIC_CSV_URL", "").strip()
           gsheet_public_url = os.getenv("GSHEET_PUBLIC_URL", "").strip()
