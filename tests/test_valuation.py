@@ -18,7 +18,8 @@ def valuation_payload() -> dict:
         "comparables": [
             {
                 "formattedAddress": "10 A St",
-                "price": 480_000,
+                "status": "closed",
+                "soldPrice": 480_000,
                 "squareFootage": 1_900,
                 "yearBuilt": 1998,
                 "propertyType": "Single Family",
@@ -28,7 +29,8 @@ def valuation_payload() -> dict:
             },
             {
                 "formattedAddress": "20 B St",
-                "price": 500_000,
+                "status": "closed",
+                "soldPrice": 500_000,
                 "squareFootage": 2_000,
                 "yearBuilt": 2001,
                 "propertyType": "Single Family",
@@ -38,7 +40,8 @@ def valuation_payload() -> dict:
             },
             {
                 "formattedAddress": "30 C St",
-                "price": 520_000,
+                "status": "closed",
+                "soldPrice": 520_000,
                 "squareFootage": 2_100,
                 "yearBuilt": 2003,
                 "propertyType": "Single Family",
@@ -48,7 +51,8 @@ def valuation_payload() -> dict:
             },
             {
                 "formattedAddress": "40 D St",
-                "price": 495_000,
+                "status": "closed",
+                "soldPrice": 495_000,
                 "squareFootage": 1_980,
                 "yearBuilt": 1999,
                 "propertyType": "Single Family",
@@ -58,7 +62,8 @@ def valuation_payload() -> dict:
             },
             {
                 "formattedAddress": "50 E St",
-                "price": 510_000,
+                "status": "closed",
+                "soldPrice": 510_000,
                 "squareFootage": 2_050,
                 "yearBuilt": 2000,
                 "propertyType": "Single Family",
@@ -69,7 +74,8 @@ def valuation_payload() -> dict:
             # Rejected: outside size, year, or radius constraints.
             {
                 "formattedAddress": "60 Too Large St",
-                "price": 900_000,
+                "status": "closed",
+                "soldPrice": 900_000,
                 "squareFootage": 3_500,
                 "yearBuilt": 2000,
                 "propertyType": "Single Family",
@@ -79,7 +85,8 @@ def valuation_payload() -> dict:
             },
             {
                 "formattedAddress": "70 Too Old St",
-                "price": 250_000,
+                "status": "closed",
+                "soldPrice": 250_000,
                 "squareFootage": 2_000,
                 "yearBuilt": 1960,
                 "propertyType": "Single Family",
@@ -89,7 +96,8 @@ def valuation_payload() -> dict:
             },
             {
                 "formattedAddress": "80 Too Far St",
-                "price": 800_000,
+                "status": "closed",
+                "soldPrice": 800_000,
                 "squareFootage": 2_000,
                 "yearBuilt": 2000,
                 "propertyType": "Single Family",
@@ -118,7 +126,7 @@ class ValuationTests(unittest.TestCase):
         result = calculate_comp_valuation(payload)
 
         self.assertEqual(result.status, "unavailable")
-        self.assertEqual(result.reason, "only 1 eligible comps")
+        self.assertEqual(result.reason, "only 1 eligible closed comps")
 
 
 if __name__ == "__main__":

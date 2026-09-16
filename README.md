@@ -17,11 +17,12 @@ Stage-one underwriting activates only when an independent valuation provider is
 configured. It is designed to prioritize leads for an ARMLS CMA, not approve a
 purchase. Sender-provided ARV is never extracted, displayed, or used.
 
-The first provider integration uses RentCast's comparable listings, but ignores
-RentCast's own AVM number. The engine applies its own filters (1 mile, 180 days,
-similar size/year/type and minimum correlation), adjusts each comp to the
-subject's square footage, and calculates weighted low/likely/high ARV estimates.
-The conservative low estimate is used for profit and MAO calculations.
+Cloud CMA supplies ARMLS report data asynchronously through a private result
+email. The engine requests a report once per unique address, extracts only
+closed-sale prices from the PDF, applies its own size/year/type/bed/bath and
+recency rules, and calculates weighted low/likely/high ARV estimates. Cloud
+CMA's average or suggested value is never consumed. The conservative low
+estimate is used for profit and MAO calculations.
 
 Configure these sections in private `config.yaml`:
 
@@ -29,14 +30,19 @@ Configure these sections in private `config.yaml`:
 state_max_seen: 2000
 valuation:
   enabled: true
-  provider: rentcast
-  api_key: YOUR_RENTCAST_API_KEY
+  provider: cloud_cma
+  api_key: YOUR_CLOUD_CMA_API_KEY
+  result_email: you@example.com
+  result_folder: INBOX
+  template: Web Leads
+  min_listings: 25
+  max_requests_per_run: 3
+  max_requests_per_day: 10
+  request_ttl_days: 30
   max_radius: 1.0
   days_old: 180
-  comp_count: 25
   size_tolerance: 0.20
   year_tolerance: 10
-  min_correlation: 0.75
   minimum_comps: 3
 screening:
   enabled: true
@@ -51,8 +57,14 @@ screening:
 Important safeguards:
 
 - Sender-provided ARV is ignored completely.
-- The provider's AVM estimate is also ignored; only eligible comparable records feed our calculation.
-- Public-data comp scores are capped at 84, below the 85+ immediate tier.
+- Cloud CMA averages/suggested values and active/pending prices never feed ARV;
+  only eligible closed-sale records do.
+- Cloud CMA PDFs do not expose numeric comp distance. Until a broker-approved
+  structured feed supplies it, results remain low-confidence and require final
+  ARMLS radius verification.
+- Automated comp scores are capped at 84, below the 85+ immediate tier.
+- Requests are capped per run/day and cached by an opaque address hash for 30
+  days. Raw MLS report data is not committed to the repository or sent to Telegram.
 - Missing ask or independent comp ARV produces `VALUATION REQUIRED` rather than a guessed result.
 - Rehab is labeled as provided or assumed. When absent, the engine uses configured
   dollars per sqft, then a flat fallback when sqft is also missing.
@@ -162,7 +174,7 @@ Optional:
 - `ZOHO_IMAP_HOST` (defaults to `imap.zoho.com`)
 - `ZOHO_FOLDER` (defaults to `Off-Market-Deals`)
 - `ZOHO_LOOKBACK_HOURS` (defaults to the template lookback window when set)
-- `RENTCAST_API_KEY` (activates independent comp valuation and pre-screening)
+- `CLOUD_CMA_API_KEY` (activates ARMLS comp-report requests and pre-screening)
 - `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`

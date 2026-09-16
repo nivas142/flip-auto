@@ -44,7 +44,7 @@ jobs:
           ZOHO_LOOKBACK_HOURS: ${{ secrets.ZOHO_LOOKBACK_HOURS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
+          CLOUD_CMA_API_KEY: ${{ secrets.CLOUD_CMA_API_KEY }}
           GSHEET_PUBLIC_CSV_URL: ${{ secrets.GSHEET_PUBLIC_CSV_URL }}
           GSHEET_PUBLIC_URL: ${{ secrets.GSHEET_PUBLIC_URL }}
           GSHEET_SPREADSHEET_ID: ${{ secrets.GSHEET_SPREADSHEET_ID }}
@@ -106,18 +106,26 @@ jobs:
           cfg.setdefault("telegram", {})["bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
           cfg.setdefault("telegram", {})["chat_id"] = os.environ["TELEGRAM_CHAT_ID"]
 
-          rentcast_api_key = os.getenv("RENTCAST_API_KEY", "").strip()
-          if rentcast_api_key:
+          cloud_cma_api_key = os.getenv("CLOUD_CMA_API_KEY", "").strip()
+          if cloud_cma_api_key:
               cfg["valuation"] = {
                   "enabled": True,
-                  "provider": "rentcast",
-                  "api_key": rentcast_api_key,
+                  "provider": "cloud_cma",
+                  "api_key": cloud_cma_api_key,
+                  "result_email": os.environ["EMAIL_USERNAME"],
+                  "result_account_label": "email",
+                  "result_folder": "INBOX",
+                  "result_lookback_hours": 72,
+                  "template": "Web Leads",
+                  "min_listings": 25,
+                  "max_requests_per_run": 3,
+                  "max_requests_per_day": 10,
+                  "request_ttl_days": 30,
+                  "max_report_mb": 80,
                   "max_radius": 1.0,
                   "days_old": 180,
-                  "comp_count": 25,
                   "size_tolerance": 0.20,
                   "year_tolerance": 10,
-                  "min_correlation": 0.75,
                   "minimum_comps": 3,
               }
               cfg["screening"] = {

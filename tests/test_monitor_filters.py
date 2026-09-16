@@ -69,6 +69,38 @@ class FakeIMAP:
 
 
 class MonitorFilterTests(unittest.TestCase):
+    def test_cloud_cma_request_is_deduped_without_persisting_raw_address(self):
+        deal = monitor.PropertyDeal(
+            city="Gilbert",
+            address="2010 E Arabian Dr, Gilbert, AZ 85296",
+            price="$378,000",
+            details_url="",
+            image_url="",
+            summary="4 beds 3 baths 1,625 sqft built 1997",
+        )
+        state: dict = {}
+        budget = [3]
+        cfg = {
+            "api_key": "secret",
+            "result_email": "agent@example.com",
+            "min_listings": 25,
+            "days_old": 180,
+        }
+
+        with patch.object(monitor, "request_quick_cma") as request_mock:
+            request_mock.return_value.accepted = True
+            request_mock.return_value.status_code = 200
+            first = monitor.request_cloud_cma_for_deal(deal, cfg, state, budget)
+            second = monitor.request_cloud_cma_for_deal(deal, cfg, state, budget)
+
+        self.assertEqual(first.status, "pending")
+        self.assertEqual(second.status, "pending")
+        self.assertEqual(request_mock.call_count, 1)
+        self.assertEqual(budget[0], 2)
+        serialized_state = str(state)
+        self.assertNotIn("Arabian", serialized_state)
+        self.assertNotIn("Gilbert", serialized_state)
+
     def test_screening_emits_each_matching_city_deal(self):
         raw_message = build_html_email_bytes(
             from_addr="Deals <deals@example.com>",
@@ -106,7 +138,7 @@ class MonitorFilterTests(unittest.TestCase):
             comparables=(),
         )
         with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
-            monitor, "fetch_independent_valuation", return_value=independent
+            monitor, "request_cloud_cma_for_deal", return_value=independent
         ):
             results = monitor.scan_email_account(
                 account_cfg,

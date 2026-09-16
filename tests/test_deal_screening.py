@@ -30,7 +30,7 @@ def independent_valuation(
     )
     return ValuationResult(
         status="complete",
-        source="rentcast_comps",
+        source="cloud_cma_armls_comps",
         arv_low=low,
         arv_likely=likely,
         arv_high=high,
