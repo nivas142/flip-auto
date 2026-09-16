@@ -3,8 +3,11 @@ main = "src/index.js"
 compatibility_date = "2026-09-16"
 workers_dev = true
 
+[vars]
+GITHUB_REPOSITORY = "nivas142/flip-auto"
+GITHUB_WORKFLOW = "monitor.yml"
+GITHUB_REF = "main"
+
 [[kv_namespaces]]
 binding = "CMA_RESULTS"
 id = "__KV_NAMESPACE_ID__"
-
-# Trigger initial deployment
