@@ -1,9 +1,6 @@
 name: Flip Auto Monitor
 
 on:
-  push:
-    branches:
-      - feature/pre-screening-engine-v1
   workflow_dispatch:
   schedule:
     # Every 30 min from 8:00 AM to 5:30 PM America/Phoenix (UTC-7)
