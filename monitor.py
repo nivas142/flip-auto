@@ -72,6 +72,7 @@ class AlertItem:
     title: str
     body: str
     city: str
+    notify: bool = True
 
 
 @dataclass
@@ -850,6 +851,11 @@ def build_deal_alert(
         title=f"{screening.label}: {deal.city}",
         body="\n".join(lines),
         city=deal.city,
+        notify=screening.status in {
+            "candidate",
+            "high_risk_review",
+            "price_dependent",
+        },
     )
 
 
@@ -1023,6 +1029,9 @@ def scan_email_account(
                     title=title,
                     body=content,
                     city=city,
+                    # Once pre-screening is enabled, a city-only match is not
+                    # enough evidence to interrupt the user.
+                    notify=not screening_enabled,
                 )
             )
         return results
@@ -1081,6 +1090,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     sheet_cfg = config.get("gsheet", {})
     if not sheet_cfg.get("enabled", False):
         return []
+    screening_enabled = bool(config.get("screening", {}).get("enabled", False))
     content_columns = sheet_cfg.get("content_columns", [])
     city_column = sheet_cfg.get("city_column", "city")
     row_id_column = sheet_cfg.get("row_id_column", "id")
@@ -1174,6 +1184,9 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
                 title=f"Sheet match: {city_match}",
                 body=body[:900],
                 city=city_match,
+                # Sheet rows are ingestion/audit records, not independent
+                # completed underwriting results.
+                notify=not screening_enabled,
             )
         )
 
@@ -1282,23 +1295,31 @@ def main() -> int:
         )
 
     sent = 0
+    suppressed = 0
     for item in matches:
         if item.item_id in seen:
             continue
 
-        if not send_alert(config, item):
-            print(f"[DRY RUN] {item.title}\n{item.body}\n")
+        if item.notify:
+            if not send_alert(config, item):
+                print(f"[DRY RUN] {item.title}\n{item.body}\n")
+            sent += 1
+        else:
+            print(f"[SUPPRESSED] {item.title}")
+            suppressed += 1
 
         seen.add(item.item_id)
         seen_order.append(item.item_id)
-        sent += 1
 
     # Keep state bounded.
     max_seen = max(100, int(config.get("state_max_seen", 2000)))
     state["seen"] = seen_order[-max_seen:]
     save_state(state_path, state)
 
-    print(f"Processed {len(matches)} matches, sent {sent} new alerts.")
+    print(
+        f"Processed {len(matches)} matches, sent {sent} new alerts, "
+        f"suppressed {suppressed}."
+    )
     return 0
 
 
