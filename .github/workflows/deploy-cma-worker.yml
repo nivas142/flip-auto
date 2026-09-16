@@ -1,0 +1,54 @@
+name: Deploy Cloud CMA Callback Worker
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create or find KV namespace
+        id: kv
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          namespaces="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api?per_page=100")"
+          kv_id="$(jq -r '.result[] | select(.title == "flip-auto-cma-results") | .id' <<<"$namespaces" | head -n1)"
+          if [ -z "$kv_id" ]; then
+            created="$(curl --fail-with-body --silent --show-error -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data '{"title":"flip-auto-cma-results"}' "$api")"
+            kv_id="$(jq -r '.result.id' <<<"$created")"
+          fi
+          test -n "$kv_id"
+          sed "s/__KV_NAMESPACE_ID__/$kv_id/" worker/wrangler.template.toml > worker/wrangler.toml
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --config worker/wrangler.toml
+
+      - name: Set Worker callback secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUD_CMA_WEBHOOK_SECRET: ${{ secrets.CLOUD_CMA_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          test ${#CLOUD_CMA_WEBHOOK_SECRET} -ge 32
+          printf '%s' "$CLOUD_CMA_WEBHOOK_SECRET" | \
+            npx --yes wrangler@4 secret put CALLBACK_SECRET --config worker/wrangler.toml

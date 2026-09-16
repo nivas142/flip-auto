@@ -17,8 +17,8 @@ Stage-one underwriting activates only when an independent valuation provider is
 configured. It is designed to prioritize leads for an ARMLS CMA, not approve a
 purchase. Sender-provided ARV is never extracted, displayed, or used.
 
-Cloud CMA supplies ARMLS report data asynchronously through a private result
-email. The engine requests a report once per unique address, extracts only
+Cloud CMA supplies ARMLS report data asynchronously through a private Cloudflare
+Worker webhook. The engine requests a report once per unique address, extracts only
 closed-sale prices from the PDF, applies its own size/year/type/bed/bath and
 recency rules, and calculates weighted low/likely/high ARV estimates. Cloud
 CMA's average or suggested value is never consumed. The conservative low
@@ -32,8 +32,8 @@ valuation:
   enabled: true
   provider: cloud_cma
   api_key: YOUR_CLOUD_CMA_API_KEY
-  result_email: you@example.com
-  result_folder: INBOX
+  callback_base_url: https://flip-auto-cma-callback.YOUR_SUBDOMAIN.workers.dev
+  callback_secret: YOUR_RANDOM_WEBHOOK_SECRET
   template: Web Leads
   min_listings: 25
   max_requests_per_run: 1
@@ -175,6 +175,7 @@ Optional:
 - `ZOHO_FOLDER` (defaults to `Off-Market-Deals`)
 - `ZOHO_LOOKBACK_HOURS` (defaults to the template lookback window when set)
 - `CLOUD_CMA_API_KEY` (activates ARMLS comp-report requests and pre-screening)
+- `CLOUD_CMA_WEBHOOK_SECRET` (required with `CLOUD_CMA_API_KEY`; use 32+ random characters)
 - `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`
@@ -198,6 +199,23 @@ This is required so the workflow can auto-commit `state/monitor_state.json` when
 - If `GSHEET_SERVICE_ACCOUNT_JSON` is set, writes it to `creds/google-service-account.json` at runtime.
 - Runs `python monitor.py`.
 - Commits `state/monitor_state.json` when updated.
+
+## Cloud CMA callback Worker
+
+Cloud CMA report completion does not depend on email. The Worker receives
+Cloud CMA's `job_id` and `pdf_url`, retains that small result in KV for seven
+days, and lets the monitor retrieve it using a bearer secret. It does not store
+the PDF or parsed MLS comp rows.
+
+Add these repository secrets:
+
+- `CLOUDFLARE_API_TOKEN` with only Workers Scripts Edit and Workers KV Storage Edit
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUD_CMA_WEBHOOK_SECRET` with at least 32 random characters
+
+Run **Deploy Cloud CMA Callback Worker** manually. Copy the deployed
+`https://...workers.dev` URL and add it as an Actions repository variable named
+`CLOUD_CMA_CALLBACK_BASE_URL`. No Cloudflare zone or DNS permission is needed.
 
 ### 4) Local development
 

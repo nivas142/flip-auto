@@ -82,12 +82,16 @@ class MonitorFilterTests(unittest.TestCase):
         budget = [3]
         cfg = {
             "api_key": "secret",
-            "result_email": "agent@example.com",
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
             "min_listings": 25,
             "days_old": 180,
         }
 
-        with patch.object(monitor, "request_quick_cma") as request_mock:
+        with (
+            patch.object(monitor, "request_quick_cma") as request_mock,
+            patch.object(monitor, "fetch_result", return_value=None),
+        ):
             request_mock.return_value.accepted = True
             request_mock.return_value.status_code = 200
             first = monitor.request_cloud_cma_for_deal(deal, cfg, state, budget)
@@ -100,6 +104,49 @@ class MonitorFilterTests(unittest.TestCase):
         serialized_state = str(state)
         self.assertNotIn("Arabian", serialized_state)
         self.assertNotIn("Gilbert", serialized_state)
+
+    def test_completed_callback_is_parsed_and_deleted(self):
+        deal = monitor.PropertyDeal(
+            city="Gilbert",
+            address="2010 E Arabian Dr, Gilbert, AZ 85296",
+            price="$378,000",
+            details_url="",
+            image_url="",
+            summary="4 beds 3 baths 1,625 sqft built 1997",
+        )
+        request_key = monitor.cma_address_hash(deal.address)
+        state = {"cma_requests": {request_key: datetime.now(timezone.utc).isoformat()}}
+        cfg = {
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
+            "max_report_mb": 80,
+        }
+        expected = ValuationResult(
+            status="complete",
+            source="test",
+            arv_low=480_000,
+            arv_likely=490_000,
+            arv_high=500_000,
+            confidence="low",
+            subject_square_footage=1_625,
+            comparables=(),
+        )
+        with (
+            patch.object(monitor, "fetch_result", return_value="https://cloudcma.com/pdf/abc"),
+            patch.object(monitor, "download_cloud_cma_pdf", return_value=b"%PDF report"),
+            patch.object(
+                monitor,
+                "parse_cloud_cma_pdf",
+                return_value={"subjectProperty": {}, "comparables": [{"status": "closed"}]},
+            ),
+            patch.object(monitor, "calculate_comp_valuation", return_value=expected),
+            patch.object(monitor, "delete_result") as delete_mock,
+        ):
+            result = monitor.request_cloud_cma_for_deal(deal, cfg, state, [0])
+
+        self.assertEqual(result, expected)
+        delete_mock.assert_called_once()
+        self.assertIn(request_key, state["cma_reports_processed"])
 
     def test_screening_emits_each_matching_city_deal(self):
         raw_message = build_html_email_bytes(

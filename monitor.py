@@ -36,10 +36,10 @@ from bs4 import BeautifulSoup
 
 from cloud_cma import (
     download_cloud_cma_pdf,
-    extract_cloud_cma_pdf_urls,
     parse_cloud_cma_pdf,
     request_quick_cma,
 )
+from cloud_cma_callback import callback_delivery_url, delete_result, fetch_result
 from deal_screening import (
     extract_deal_facts,
     format_screening_result,
@@ -96,12 +96,6 @@ PLAIN_PRICE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 URL_RE = re.compile(r"https?://[^\s\])>]+", flags=re.IGNORECASE)
-CLOUD_CMA_SUBJECT_RE = re.compile(
-    r"^Flip Auto CMA\s+\[(?P<token>[a-f0-9]{8,64})\]\s+(?P<address>.+)$",
-    flags=re.IGNORECASE,
-)
-
-
 def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
@@ -463,7 +457,47 @@ def request_cloud_cma_for_deal(
     request_key = cma_address_hash(deal.address)
     requests = state.setdefault("cma_requests", {})
     if request_key in requests:
-        return pending_valuation("Cloud CMA report already requested")
+        pdf_url = fetch_result(
+            str(valuation_cfg.get("callback_base_url") or ""),
+            request_key,
+            str(valuation_cfg.get("callback_secret") or ""),
+        )
+        if not pdf_url:
+            return pending_valuation("Cloud CMA report already requested")
+
+        pdf_bytes = download_cloud_cma_pdf(pdf_url)
+        max_bytes = int(valuation_cfg.get("max_report_mb", 80)) * 1024 * 1024
+        if len(pdf_bytes) > max_bytes:
+            raise ValueError("Cloud CMA PDF exceeds configured size limit")
+        payload = parse_cloud_cma_pdf(pdf_bytes, requested_address=deal.address)
+        facts = extract_deal_facts(
+            address=deal.address,
+            city=deal.city,
+            price=deal.price,
+            summary=deal.summary,
+        )
+        subject = dict(payload.get("subjectProperty") or {})
+        subject.update(
+            {
+                key: value
+                for key, value in {
+                    "squareFootage": facts.sqft,
+                    "beds": facts.beds,
+                    "baths": facts.baths,
+                    "yearBuilt": facts.year_built,
+                }.items()
+                if value is not None
+            }
+        )
+        payload["subjectProperty"] = subject
+        valuation = calculate_comp_valuation(payload, valuation_cfg)
+        delete_result(
+            str(valuation_cfg.get("callback_base_url") or ""),
+            request_key,
+            str(valuation_cfg.get("callback_secret") or ""),
+        )
+        state.setdefault("cma_reports_processed", {})[request_key] = datetime.now(UTC).isoformat()
+        return valuation
     if request_budget[0] <= 0:
         return pending_valuation("Cloud CMA request queue is rate limited")
 
@@ -476,8 +510,11 @@ def request_cloud_cma_for_deal(
     submission = request_quick_cma(
         api_key=str(valuation_cfg.get("api_key") or ""),
         address=deal.address,
-        email_to=str(valuation_cfg.get("result_email") or ""),
-        subject_token=request_key[:16],
+        callback_url=callback_delivery_url(
+            str(valuation_cfg.get("callback_base_url") or ""),
+            str(valuation_cfg.get("callback_secret") or ""),
+        ),
+        job_id=request_key,
         sqft=facts.sqft,
         beds=facts.beds,
         baths=facts.baths,
@@ -491,95 +528,6 @@ def request_cloud_cma_for_deal(
     requests[request_key] = datetime.now(UTC).isoformat()
     request_budget[0] -= 1
     return pending_valuation("Cloud CMA report requested")
-
-
-def scan_cloud_cma_reports(
-    account_cfg: dict[str, Any],
-    valuation_cfg: dict[str, Any],
-    state: dict[str, Any],
-) -> dict[str, dict[str, Any]]:
-    """Download new result emails and return normalized report payloads by address."""
-    host = account_cfg["imap_host"]
-    username = account_cfg["username"]
-    password = account_cfg["password"]
-    folder = str(valuation_cfg.get("result_folder") or "INBOX")
-    lookback_hours = max(1, int(valuation_cfg.get("result_lookback_hours", 72)))
-    cutoff_dt = datetime.now(UTC) - timedelta(hours=lookback_hours)
-    processed = state.setdefault("cma_reports_processed", {})
-    payloads: dict[str, dict[str, Any]] = {}
-    mail = None
-
-    try:
-        mail = imaplib.IMAP4_SSL(host)
-        mail.login(username, password)
-        status, _ = mail.select(folder)
-        if status != "OK":
-            raise RuntimeError(f"Could not select Cloud CMA result folder '{folder}'")
-        since_date = cutoff_dt.strftime("%d-%b-%Y")
-        status, msg_ids = mail.search(None, f'(SINCE "{since_date}")')
-        if status != "OK":
-            return {}
-
-        for msg_id in reversed(msg_ids[0].split()):
-            status, header_data = mail.fetch(msg_id, "(BODY.PEEK[HEADER])")
-            header_raw = extract_fetch_bytes(header_data) if status == "OK" else None
-            if not header_raw:
-                continue
-            header_msg = message_from_bytes(header_raw)
-            msg_dt = parse_email_datetime(header_msg)
-            if msg_dt is not None and msg_dt < cutoff_dt:
-                continue
-            subject = normalize_text(parse_email_subject(header_msg))
-            subject_match = CLOUD_CMA_SUBJECT_RE.match(subject)
-            if not subject_match:
-                continue
-
-            status, data = mail.fetch(msg_id, "(BODY.PEEK[])")
-            raw = extract_fetch_bytes(data) if status == "OK" else None
-            if not raw:
-                continue
-            msg = message_from_bytes(raw)
-            link_content = "\n".join(
-                (decode_email_part(msg, "text/plain"), decode_email_part(msg, "text/html"))
-            )
-            urls = extract_cloud_cma_pdf_urls(link_content)
-            if not urls:
-                continue
-
-            address = normalize_text(subject_match.group("address"))
-            for report_url in urls[:1]:
-                report_key = stable_id(["cloud-cma-report", report_url])
-                if report_key in processed:
-                    continue
-                try:
-                    pdf_bytes = download_cloud_cma_pdf(report_url)
-                    max_bytes = int(valuation_cfg.get("max_report_mb", 80)) * 1024 * 1024
-                    if len(pdf_bytes) > max_bytes:
-                        raise ValueError("Cloud CMA PDF exceeds configured size limit")
-                    payload = parse_cloud_cma_pdf(
-                        pdf_bytes,
-                        requested_address=address,
-                    )
-                    if payload.get("comparables"):
-                        payloads[normalize_address_key(address)] = payload
-                        processed[report_key] = datetime.now(UTC).isoformat()
-                except Exception as exc:
-                    print(
-                        f"[WARN] Cloud CMA report processing failed "
-                        f"({exc.__class__.__name__}: {exc}).",
-                        file=sys.stderr,
-                    )
-        return payloads
-    finally:
-        if mail is not None:
-            try:
-                mail.close()
-            except Exception:
-                pass
-            try:
-                mail.logout()
-            except Exception:
-                pass
 
 
 def normalize_list(value: Any) -> list[str]:
@@ -920,7 +868,6 @@ def scan_email_account(
     account_cfg: dict[str, Any],
     screening_cfg: dict[str, Any] | None = None,
     valuation_cfg: dict[str, Any] | None = None,
-    report_payloads: dict[str, dict[str, Any]] | None = None,
     seen: set[str] | None = None,
     state: dict[str, Any] | None = None,
     request_budget: list[int] | None = None,
@@ -937,7 +884,6 @@ def scan_email_account(
     label = account_cfg.get("label") or username or host
     screening_cfg = screening_cfg or {}
     valuation_cfg = valuation_cfg or {}
-    report_payloads = report_payloads if report_payloads is not None else {}
     seen = seen or set()
     state = state if state is not None else {"cma_requests": {}}
     request_budget = request_budget if request_budget is not None else [0]
@@ -1009,51 +955,25 @@ def scan_email_account(
                     item_id = deal_item_id(deal)
                     if item_id in seen:
                         continue
-                    address_key = normalize_address_key(deal.address)
-                    payload = report_payloads.get(address_key)
-                    if payload is not None:
-                        facts = extract_deal_facts(
-                            address=deal.address,
-                            city=deal.city,
-                            price=deal.price,
-                            summary=deal.summary,
+                    try:
+                        valuation = request_cloud_cma_for_deal(
+                            deal,
+                            valuation_cfg,
+                            state,
+                            request_budget,
                         )
-                        subject = dict(payload.get("subjectProperty") or {})
-                        subject.update(
-                            {
-                                key: value
-                                for key, value in {
-                                    "squareFootage": facts.sqft,
-                                    "beds": facts.beds,
-                                    "baths": facts.baths,
-                                    "yearBuilt": facts.year_built,
-                                }.items()
-                                if value is not None
-                            }
+                    except Exception as exc:
+                        print(
+                            f"[WARN] Cloud CMA request failed for {deal.address} "
+                            f"({exc.__class__.__name__}: {exc}).",
+                            file=sys.stderr,
                         )
-                        normalized_payload = dict(payload)
-                        normalized_payload["subjectProperty"] = subject
-                        valuation = calculate_comp_valuation(normalized_payload, valuation_cfg)
-                    else:
-                        try:
-                            valuation = request_cloud_cma_for_deal(
-                                deal,
-                                valuation_cfg,
-                                state,
-                                request_budget,
-                            )
-                        except Exception as exc:
-                            print(
-                                f"[WARN] Cloud CMA request failed for {deal.address} "
-                                f"({exc.__class__.__name__}: {exc}).",
-                                file=sys.stderr,
-                            )
-                            valuation = unavailable_valuation(str(exc))
+                        valuation = unavailable_valuation(str(exc))
 
                     # Pending requests are intentionally silent. The original
                     # deal remains unseen and will be combined with the report
                     # on the next scheduled run.
-                    if payload is None and valuation.status != "complete":
+                    if valuation.status != "complete":
                         continue
                     results.append(
                         build_deal_alert(
@@ -1139,27 +1059,6 @@ def scan_emails(
     state = state if state is not None else {}
     prune_cma_state(state, valuation_cfg)
 
-    report_payloads: dict[str, dict[str, Any]] = {}
-    if valuation_cfg.get("enabled", False) and str(valuation_cfg.get("provider", "")).lower() == "cloud_cma":
-        result_email = normalize_text(str(valuation_cfg.get("result_email", ""))).lower()
-        result_label = normalize_text(str(valuation_cfg.get("result_account_label", ""))).lower()
-        result_account = next(
-            (
-                account
-                for account in accounts
-                if (result_email and account["username"].lower() == result_email)
-                or (result_label and str(account.get("label", "")).lower() == result_label)
-            ),
-            accounts[0],
-        )
-        try:
-            report_payloads = scan_cloud_cma_reports(result_account, valuation_cfg, state)
-        except Exception as exc:
-            print(
-                f"[WARN] Cloud CMA result scan failed ({exc.__class__.__name__}: {exc}).",
-                file=sys.stderr,
-            )
-
     max_per_run = max(0, int(valuation_cfg.get("max_requests_per_run", 3)))
     max_per_day = max(0, int(valuation_cfg.get("max_requests_per_day", 10)))
     remaining_today = max(0, max_per_day - _cloud_cma_request_count_today(state))
@@ -1170,7 +1069,6 @@ def scan_emails(
                 account_cfg,
                 screening_cfg,
                 valuation_cfg,
-                report_payloads,
                 seen,
                 state,
                 request_budget,

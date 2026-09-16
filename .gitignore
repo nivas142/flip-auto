@@ -1,5 +1,6 @@
 # Local runtime config with secrets
 config.yaml
+worker/wrangler.toml
 
 # Local/private credentials
 creds/*.json

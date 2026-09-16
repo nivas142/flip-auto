@@ -45,6 +45,8 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CLOUD_CMA_API_KEY: ${{ secrets.CLOUD_CMA_API_KEY }}
+          CLOUD_CMA_CALLBACK_BASE_URL: ${{ vars.CLOUD_CMA_CALLBACK_BASE_URL }}
+          CLOUD_CMA_WEBHOOK_SECRET: ${{ secrets.CLOUD_CMA_WEBHOOK_SECRET }}
           GSHEET_PUBLIC_CSV_URL: ${{ secrets.GSHEET_PUBLIC_CSV_URL }}
           GSHEET_PUBLIC_URL: ${{ secrets.GSHEET_PUBLIC_URL }}
           GSHEET_SPREADSHEET_ID: ${{ secrets.GSHEET_SPREADSHEET_ID }}
@@ -108,14 +110,18 @@ jobs:
 
           cloud_cma_api_key = os.getenv("CLOUD_CMA_API_KEY", "").strip()
           if cloud_cma_api_key:
+              callback_base_url = os.getenv("CLOUD_CMA_CALLBACK_BASE_URL", "").strip()
+              callback_secret = os.getenv("CLOUD_CMA_WEBHOOK_SECRET", "").strip()
+              if not callback_base_url or not callback_secret:
+                  raise SystemExit(
+                      "CLOUD_CMA_CALLBACK_BASE_URL variable and CLOUD_CMA_WEBHOOK_SECRET secret are required."
+                  )
               cfg["valuation"] = {
                   "enabled": True,
                   "provider": "cloud_cma",
                   "api_key": cloud_cma_api_key,
-                  "result_email": os.environ["EMAIL_USERNAME"],
-                  "result_account_label": "email",
-                  "result_folder": "INBOX",
-                  "result_lookback_hours": 72,
+                  "callback_base_url": callback_base_url,
+                  "callback_secret": callback_secret,
                   "template": "Web Leads",
                   "min_listings": 25,
                   "max_requests_per_run": 1,

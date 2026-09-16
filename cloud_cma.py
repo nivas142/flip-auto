@@ -21,14 +21,6 @@ from pypdf import PdfReader
 
 UTC = timezone.utc
 CLOUD_CMA_WIDGET_URL = "https://cloudcma.com/cmas/widget"
-CLOUD_CMA_PDF_RE = re.compile(
-    r"https?://(?:www\.)?cloudcma\.com/pdf/[a-f0-9]+(?:\?[^\s\"'<>]+)?",
-    re.IGNORECASE,
-)
-DIRECT_PDF_RE = re.compile(
-    r"https?://reports\d*\.cloudcma\.com/[a-f0-9]+\.pdf(?:\?[^\s\"'<>]+)?",
-    re.IGNORECASE,
-)
 META_REFRESH_RE = re.compile(
     r"url=(https?://[^\"'<>\s]+\.pdf(?:\?[^\"'<>\s]+)?)",
     re.IGNORECASE,
@@ -45,19 +37,12 @@ def _clean(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
-def extract_cloud_cma_pdf_urls(content: str) -> list[str]:
-    """Return unique report URLs from a Cloud CMA email body."""
-    decoded = html.unescape(content or "")
-    urls = CLOUD_CMA_PDF_RE.findall(decoded) + DIRECT_PDF_RE.findall(decoded)
-    return list(dict.fromkeys(url.rstrip(".,;)") for url in urls))
-
-
 def request_quick_cma(
     *,
     api_key: str,
     address: str,
-    email_to: str,
-    subject_token: str,
+    callback_url: str,
+    job_id: str,
     sqft: int | None = None,
     beds: float | None = None,
     baths: float | None = None,
@@ -66,22 +51,23 @@ def request_quick_cma(
     template: str = "Web Leads",
     timeout: int = 30,
 ) -> CloudCmaSubmission:
-    """Request one asynchronous Quick CMA delivered to the configured inbox."""
+    """Request one asynchronous Quick CMA delivered only by webhook."""
     if not api_key.strip():
         raise ValueError("Cloud CMA API key is missing")
     if not address.strip():
         raise ValueError("Cloud CMA subject address is missing")
-    if not email_to.strip():
-        raise ValueError("Cloud CMA result email is missing")
+    if not callback_url.strip():
+        raise ValueError("Cloud CMA callback URL is missing")
+    if not job_id.strip():
+        raise ValueError("Cloud CMA callback job ID is missing")
 
     fields: dict[str, str] = {
         "api_key": api_key.strip(),
         "address": address.strip(),
-        "email_to": email_to.strip(),
-        "title": f"Flip Auto CMA [{subject_token}] {address}",
+        "callback_url": callback_url.strip(),
+        "job_id": job_id.strip(),
+        "title": f"Flip Auto CMA [{job_id[:16]}] {address}",
         "headline": "Investment Pre-Screen CMA",
-        "email_subject": f"Flip Auto CMA [{subject_token}] {address}",
-        "email_msg": "Automated private acquisition pre-screen. Do not forward.",
         "min_listings": str(max(10, min(int(min_listings), 40))),
         "months_back": str(max(1, min(int(months_back), 12))),
         "template": template,

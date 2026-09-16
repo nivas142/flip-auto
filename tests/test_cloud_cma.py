@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import unittest
 from datetime import date
+from unittest.mock import patch
+from urllib.parse import parse_qs
 
-from cloud_cma import extract_cloud_cma_pdf_urls, parse_cloud_cma_pages
+from cloud_cma import parse_cloud_cma_pages, request_quick_cma
 from valuation import calculate_comp_valuation
 
 
@@ -35,15 +37,38 @@ Pool Features: None
 
 
 class CloudCmaTests(unittest.TestCase):
-    def test_extracts_pdf_link_from_html_email(self):
-        content = (
-            '<a href="https://cloudcma.com/pdf/53882d4d8b32c72fe05cf1bd9b053817">'
-            "View report</a>"
-        )
-        self.assertEqual(
-            extract_cloud_cma_pdf_urls(content),
-            ["https://cloudcma.com/pdf/53882d4d8b32c72fe05cf1bd9b053817"],
-        )
+    def test_quick_cma_uses_webhook_without_email_delivery(self):
+        captured = {}
+
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def read(self):
+                return b"ok"
+
+        def fake_urlopen(request, timeout):
+            captured.update(parse_qs(request.data.decode("utf-8")))
+            return FakeResponse()
+
+        with patch("cloud_cma.urlopen", side_effect=fake_urlopen):
+            result = request_quick_cma(
+                api_key="api-secret",
+                address="2010 E Arabian Dr, Gilbert, AZ 85296",
+                callback_url="https://worker.example/callback/secret",
+                job_id="a" * 64,
+            )
+
+        self.assertTrue(result.accepted)
+        self.assertEqual(captured["job_id"], ["a" * 64])
+        self.assertIn("callback_url", captured)
+        self.assertNotIn("email_to", captured)
+        self.assertNotIn("email_subject", captured)
 
     def test_parses_closed_mls_details_and_subject(self):
         pages = [
