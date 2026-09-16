@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/pre-screening-engine-v1
+      - main
     paths:
       - .github/workflows/deploy-cma-worker.yml
       - worker/**
@@ -58,3 +58,14 @@ jobs:
           test ${#CLOUD_CMA_WEBHOOK_SECRET} -ge 32
           printf '%s' "$CLOUD_CMA_WEBHOOK_SECRET" | \
             npx --yes wrangler@4 secret put CALLBACK_SECRET --config worker/wrangler.toml
+
+      - name: Set Worker GitHub dispatch token
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CMA_GITHUB_DISPATCH_TOKEN: ${{ secrets.CMA_GITHUB_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          test ${#CMA_GITHUB_DISPATCH_TOKEN} -ge 20
+          printf '%s' "$CMA_GITHUB_DISPATCH_TOKEN" | \
+            npx --yes wrangler@4 secret put GITHUB_DISPATCH_TOKEN --config worker/wrangler.toml

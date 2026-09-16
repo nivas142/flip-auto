@@ -155,7 +155,7 @@ python monitor.py
 
 ## GitHub Actions Automation (Secrets-only)
 
-The workflow file is [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml). It runs every 30 minutes from 8:00 AM to 6:00 PM America/Phoenix and also supports manual runs.
+The workflow file is [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml). It runs every 30 minutes from approximately 8:07 AM to 6:07 PM America/Phoenix and also supports manual runs. The offset avoids GitHub's busiest top-of-hour scheduling window.
 
 ### 1) Add repository secrets
 
@@ -176,6 +176,7 @@ Optional:
 - `ZOHO_LOOKBACK_HOURS` (defaults to the template lookback window when set)
 - `CLOUD_CMA_API_KEY` (activates ARMLS comp-report requests and pre-screening)
 - `CLOUD_CMA_WEBHOOK_SECRET` (required with `CLOUD_CMA_API_KEY`; use 32+ random characters)
+- `CMA_GITHUB_DISPATCH_TOKEN` (fine-grained token restricted to this repository with Actions read/write; used only by the callback Worker)
 - `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`
@@ -204,18 +205,26 @@ This is required so the workflow can auto-commit `state/monitor_state.json` when
 
 Cloud CMA report completion does not depend on email. The Worker receives
 Cloud CMA's `job_id` and `pdf_url`, retains that small result in KV for seven
-days, and lets the monitor retrieve it using a bearer secret. It does not store
-the PDF or parsed MLS comp rows.
+days, and immediately dispatches the monitor workflow. Duplicate callbacks for
+the same job do not create duplicate workflow runs. The monitor retrieves the
+result using a bearer secret. The Worker does not store the PDF or parsed MLS
+comp rows.
 
 Add these repository secrets:
 
 - `CLOUDFLARE_API_TOKEN` with only Workers Scripts Edit and Workers KV Storage Edit
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUD_CMA_WEBHOOK_SECRET` with at least 32 random characters
+- `CMA_GITHUB_DISPATCH_TOKEN`, created as a fine-grained personal access token:
+  - repository access: only `nivas142/flip-auto`
+  - repository permission: Actions read/write
+  - use the shortest practical expiration and rotate it before expiration
 
 Run **Deploy Cloud CMA Callback Worker** manually. Copy the deployed
 `https://...workers.dev` URL and add it as an Actions repository variable named
 `CLOUD_CMA_CALLBACK_BASE_URL`. No Cloudflare zone or DNS permission is needed.
+The deploy workflow copies both secrets into encrypted Cloudflare Worker secrets;
+neither value belongs in `wrangler.template.toml` or any committed config file.
 
 ### 4) Local development
 
