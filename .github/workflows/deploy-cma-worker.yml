@@ -2,6 +2,12 @@ name: Deploy Cloud CMA Callback Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/pre-screening-engine-v1
+    paths:
+      - .github/workflows/deploy-cma-worker.yml
+      - worker/**
 
 permissions:
   contents: read
