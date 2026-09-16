@@ -36,7 +36,7 @@ valuation:
   result_folder: INBOX
   template: Web Leads
   min_listings: 25
-  max_requests_per_run: 3
+  max_requests_per_run: 1
   max_requests_per_day: 10
   request_ttl_days: 30
   max_radius: 1.0

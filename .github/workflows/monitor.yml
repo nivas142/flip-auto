@@ -118,7 +118,7 @@ jobs:
                   "result_lookback_hours": 72,
                   "template": "Web Leads",
                   "min_listings": 25,
-                  "max_requests_per_run": 3,
+                  "max_requests_per_run": 1,
                   "max_requests_per_day": 10,
                   "request_ttl_days": 30,
                   "max_report_mb": 80,
