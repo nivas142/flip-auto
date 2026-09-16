@@ -9,6 +9,7 @@ from email.utils import format_datetime
 from unittest.mock import patch
 
 import monitor
+from valuation import ValuationResult
 
 
 def build_email_bytes(*, from_addr: str, subject: str, body: str) -> bytes:
@@ -19,6 +20,18 @@ def build_email_bytes(*, from_addr: str, subject: str, body: str) -> bytes:
     msg["Date"] = format_datetime(datetime.now(timezone.utc))
     msg["Message-ID"] = "<test-message@example.com>"
     msg.set_content(body)
+    return msg.as_bytes()
+
+
+def build_html_email_bytes(*, from_addr: str, subject: str, html: str) -> bytes:
+    msg = EmailMessage()
+    msg["From"] = from_addr
+    msg["To"] = "nobody@example.com"
+    msg["Subject"] = subject
+    msg["Date"] = format_datetime(datetime.now(timezone.utc))
+    msg["Message-ID"] = "<test-html-message@example.com>"
+    msg.set_content("HTML deal email")
+    msg.add_alternative(html, subtype="html")
     return msg.as_bytes()
 
 
@@ -56,6 +69,170 @@ class FakeIMAP:
 
 
 class MonitorFilterTests(unittest.TestCase):
+    def test_cloud_cma_request_is_deduped_without_persisting_raw_address(self):
+        deal = monitor.PropertyDeal(
+            city="Gilbert",
+            address="2010 E Arabian Dr, Gilbert, AZ 85296",
+            price="$378,000",
+            details_url="",
+            image_url="",
+            summary="4 beds 3 baths 1,625 sqft built 1997",
+        )
+        state: dict = {}
+        budget = [3]
+        cfg = {
+            "api_key": "secret",
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
+            "min_listings": 25,
+            "days_old": 180,
+        }
+
+        with (
+            patch.object(monitor, "request_quick_cma") as request_mock,
+            patch.object(monitor, "fetch_result", return_value=None),
+        ):
+            request_mock.return_value.accepted = True
+            request_mock.return_value.status_code = 200
+            first = monitor.request_cloud_cma_for_deal(deal, cfg, state, budget)
+            second = monitor.request_cloud_cma_for_deal(deal, cfg, state, budget)
+
+        self.assertEqual(first.status, "pending")
+        self.assertEqual(second.status, "pending")
+        self.assertEqual(request_mock.call_count, 1)
+        self.assertEqual(budget[0], 2)
+        serialized_state = str(state)
+        self.assertNotIn("Arabian", serialized_state)
+        self.assertNotIn("Gilbert", serialized_state)
+
+    def test_completed_callback_is_parsed_and_deleted(self):
+        deal = monitor.PropertyDeal(
+            city="Gilbert",
+            address="2010 E Arabian Dr, Gilbert, AZ 85296",
+            price="$378,000",
+            details_url="",
+            image_url="",
+            summary="4 beds 3 baths 1,625 sqft built 1997",
+        )
+        request_key = monitor.cma_address_hash(deal.address)
+        state = {"cma_requests": {request_key: datetime.now(timezone.utc).isoformat()}}
+        cfg = {
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
+            "max_report_mb": 80,
+        }
+        expected = ValuationResult(
+            status="complete",
+            source="test",
+            arv_low=480_000,
+            arv_likely=490_000,
+            arv_high=500_000,
+            confidence="low",
+            subject_square_footage=1_625,
+            comparables=(),
+        )
+        with (
+            patch.object(monitor, "fetch_result", return_value="https://cloudcma.com/pdf/abc"),
+            patch.object(monitor, "download_cloud_cma_pdf", return_value=b"%PDF report"),
+            patch.object(
+                monitor,
+                "parse_cloud_cma_pdf",
+                return_value={"subjectProperty": {}, "comparables": [{"status": "closed"}]},
+            ),
+            patch.object(monitor, "calculate_comp_valuation", return_value=expected),
+            patch.object(monitor, "delete_result") as delete_mock,
+        ):
+            result = monitor.request_cloud_cma_for_deal(deal, cfg, state, [0])
+
+        self.assertEqual(result, expected)
+        delete_mock.assert_called_once()
+        self.assertIn(request_key, state["cma_reports_processed"])
+
+    def test_screening_emits_each_matching_city_deal(self):
+        raw_message = build_html_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New Arizona deals",
+            html="""
+                <table>
+                  <tr><td>123 Main St, Mesa, AZ 85201 ARV: $500K Price: $325,000
+                    <a href="https://example.com/mesa">Photos / Details</a></td></tr>
+                  <tr><td>456 Oak Rd, Chandler, AZ 85224 ARV: $600K Price: $400,000
+                    <a href="https://example.com/chandler">Photos / Details</a></td></tr>
+                </table>
+            """,
+        )
+        fake_imap = FakeIMAP(raw_message)
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": ["deals@example.com"],
+            "subject_filters": [],
+            "cities": ["Chandler", "Mesa"],
+        }
+
+        independent = ValuationResult(
+            status="complete",
+            source="test_comps",
+            arv_low=500_000,
+            arv_likely=515_000,
+            arv_high=530_000,
+            confidence="medium",
+            subject_square_footage=1_800,
+            comparables=(),
+        )
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
+            monitor, "request_cloud_cma_for_deal", return_value=independent
+        ):
+            results = monitor.scan_email_account(
+                account_cfg,
+                {"enabled": True},
+                {"enabled": True, "api_key": "test"},
+            )
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual({item.city for item in results}, {"Mesa", "Chandler"})
+
+    def test_structured_deal_id_dedupes_address_variants_across_sources(self):
+        first = monitor.PropertyDeal(
+            city="Mesa",
+            address="3462 E Hearn Road, Mesa, AZ 85205",
+            price="$300,000",
+            details_url="",
+            image_url="",
+            summary="1,800 SF ARV: $475,000",
+        )
+        second = monitor.PropertyDeal(
+            city="Mesa",
+            address="3462 E. Hearn Rd Mesa AZ 85205",
+            price="$300,000",
+            details_url="",
+            image_url="",
+            summary="1,800 SF ARV: $475K",
+        )
+
+        first_alert = monitor.build_deal_alert(
+            deal=first,
+            label="gmail",
+            from_header="first@example.com",
+            subject="Deal one",
+            received_at="",
+            screening_cfg={"enabled": True},
+        )
+        second_alert = monitor.build_deal_alert(
+            deal=second,
+            label="zoho",
+            from_header="second@example.com",
+            subject="Deal two",
+            received_at="",
+            screening_cfg={"enabled": True},
+        )
+
+        self.assertEqual(first_alert.item_id, second_alert.item_id)
+
     def test_account_can_clear_inherited_email_filters(self):
         config = {
             "email": {

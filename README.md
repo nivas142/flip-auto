@@ -7,6 +7,89 @@ This project includes a Python program (`monitor.py`) that:
 - Checks a Google Sheet for matching city rows.
 - Sends Telegram alerts for new matches (Twilio optional fallback).
 - Stores sent IDs in a local state file to prevent duplicate texts.
+- Extracts ask, rehab, sqft, beds/baths, year built, and risk flags.
+- Calculates a configurable first-pass profit, basis percentage, MAO, and lead score.
+- Deduplicates structured deals by normalized address and ask across mailboxes/senders.
+
+## Pre-screening engine
+
+Stage-one underwriting activates only when an independent valuation provider is
+configured. It is designed to prioritize leads for an ARMLS CMA, not approve a
+purchase. Sender-provided ARV is never extracted, displayed, or used.
+
+Cloud CMA supplies ARMLS report data asynchronously through a private Cloudflare
+Worker webhook. The engine requests a report once per unique address, extracts only
+closed-sale prices from the PDF, applies its own size/year/type/bed/bath and
+recency rules, and calculates weighted low/likely/high ARV estimates. Cloud
+CMA's average or suggested value is never consumed. The conservative low
+estimate is used for profit and MAO calculations.
+
+Configure these sections in private `config.yaml`:
+
+```yaml
+state_max_seen: 2000
+valuation:
+  enabled: true
+  provider: cloud_cma
+  api_key: YOUR_CLOUD_CMA_API_KEY
+  callback_base_url: https://flip-auto-cma-callback.YOUR_SUBDOMAIN.workers.dev
+  callback_secret: YOUR_RANDOM_WEBHOOK_SECRET
+  template: Web Leads
+  min_listings: 25
+  max_requests_per_run: 1
+  max_requests_per_day: 10
+  request_ttl_days: 30
+  max_radius: 1.0
+  days_old: 180
+  size_tolerance: 0.20
+  year_tolerance: 10
+  minimum_comps: 3
+screening:
+  enabled: true
+  target_profit: 50000
+  selling_cost_percent: 0.07
+  other_costs: 12000
+  max_basis_percent: 0.80
+  default_rehab_per_sqft: 20
+  fallback_rehab: 35000
+```
+
+Important safeguards:
+
+- Sender-provided ARV is ignored completely.
+- Cloud CMA averages/suggested values and active/pending prices never feed ARV;
+  only eligible closed-sale records do.
+- Cloud CMA PDFs do not expose numeric comp distance. Until a broker-approved
+  structured feed supplies it, results remain low-confidence and require final
+  ARMLS radius verification.
+- Automated comp scores are capped at 84, below the 85+ immediate tier.
+- Requests are capped per run/day and cached by an opaque address hash for 30
+  days. Raw MLS report data is not committed to the repository or sent to Telegram.
+- Missing ask or independent comp ARV produces `VALUATION REQUIRED` rather than a guessed result.
+- Rehab is labeled as provided or assumed. When absent, the engine uses configured
+  dollars per sqft, then a flat fallback when sqft is also missing.
+- Structured multi-property emails produce one alert per matching property, even
+  when the properties are in different configured cities.
+
+Default calculations:
+
+```text
+Preliminary profit = conservative independent ARV - ask - rehab - selling costs - other costs
+Basis % = (ask + rehab) / conservative independent ARV
+Target MAO = conservative independent ARV - rehab - selling costs - other costs - target profit
+```
+
+Tune these settings under `screening`:
+
+- `target_profit`
+- `selling_cost_percent`
+- `other_costs`
+- `max_basis_percent`
+- `default_rehab_per_sqft`
+- `fallback_rehab`
+
+Set `screening.enabled: false` in private config to retain the legacy
+email-level alert format.
 
 ## Setup
 
@@ -25,6 +108,7 @@ Copy-Item config.example.yaml config.yaml
 ```
 
 Edit `config.yaml`:
+- Optional `screening` overrides for stage-one underwriting assumptions and scoring.
 - `email.sender_filters` for allowed senders.
 - `email.subject_filters` for subject phrases that must also match when set.
 - `email.lookback_hours` or `email.lookback_minutes` for how far back IMAP email should be scanned.
@@ -90,6 +174,8 @@ Optional:
 - `ZOHO_IMAP_HOST` (defaults to `imap.zoho.com`)
 - `ZOHO_FOLDER` (defaults to `Off-Market-Deals`)
 - `ZOHO_LOOKBACK_HOURS` (defaults to the template lookback window when set)
+- `CLOUD_CMA_API_KEY` (activates ARMLS comp-report requests and pre-screening)
+- `CLOUD_CMA_WEBHOOK_SECRET` (required with `CLOUD_CMA_API_KEY`; use 32+ random characters)
 - `GSHEET_PUBLIC_CSV_URL`
 - `GSHEET_PUBLIC_URL`
 - `GSHEET_SPREADSHEET_ID`
@@ -113,6 +199,23 @@ This is required so the workflow can auto-commit `state/monitor_state.json` when
 - If `GSHEET_SERVICE_ACCOUNT_JSON` is set, writes it to `creds/google-service-account.json` at runtime.
 - Runs `python monitor.py`.
 - Commits `state/monitor_state.json` when updated.
+
+## Cloud CMA callback Worker
+
+Cloud CMA report completion does not depend on email. The Worker receives
+Cloud CMA's `job_id` and `pdf_url`, retains that small result in KV for seven
+days, and lets the monitor retrieve it using a bearer secret. It does not store
+the PDF or parsed MLS comp rows.
+
+Add these repository secrets:
+
+- `CLOUDFLARE_API_TOKEN` with only Workers Scripts Edit and Workers KV Storage Edit
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUD_CMA_WEBHOOK_SECRET` with at least 32 random characters
+
+Run **Deploy Cloud CMA Callback Worker** manually. Copy the deployed
+`https://...workers.dev` URL and add it as an Actions repository variable named
+`CLOUD_CMA_CALLBACK_BASE_URL`. No Cloudflare zone or DNS permission is needed.
 
 ### 4) Local development
 

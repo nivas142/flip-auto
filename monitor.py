@@ -34,6 +34,25 @@ import imaplib
 import yaml
 from bs4 import BeautifulSoup
 
+from cloud_cma import (
+    download_cloud_cma_pdf,
+    parse_cloud_cma_pdf,
+    request_quick_cma,
+)
+from cloud_cma_callback import callback_delivery_url, delete_result, fetch_result
+from deal_screening import (
+    extract_deal_facts,
+    format_screening_result,
+    normalize_address_key,
+    screen_deal,
+)
+from valuation import (
+    ValuationResult,
+    calculate_comp_valuation,
+    pending_valuation,
+    unavailable_valuation,
+)
+
 
 UTC = timezone.utc
 PROXY_ENV_KEYS = (
@@ -77,8 +96,6 @@ PLAIN_PRICE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 URL_RE = re.compile(r"https?://[^\s\])>]+", flags=re.IGNORECASE)
-
-
 def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
@@ -385,6 +402,134 @@ def stable_id(parts: list[str]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
+def cma_address_hash(address: str) -> str:
+    """Hash addresses before persisting request state in the repository."""
+    return stable_id(["cloud-cma", normalize_address_key(address)])
+
+
+def _parse_state_timestamp(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    except (TypeError, ValueError):
+        return None
+
+
+def prune_cma_state(state: dict[str, Any], valuation_cfg: dict[str, Any]) -> None:
+    """Keep only opaque hashes/timestamps and expire old request markers."""
+    now = datetime.now(UTC)
+    ttl_days = max(1, int(valuation_cfg.get("request_ttl_days", 30)))
+    cutoff = now - timedelta(days=ttl_days)
+    requests = state.setdefault("cma_requests", {})
+    state["cma_requests"] = {
+        key: timestamp
+        for key, timestamp in requests.items()
+        if (_parse_state_timestamp(str(timestamp)) or datetime.min.replace(tzinfo=UTC)) >= cutoff
+    }
+
+    report_cutoff = now - timedelta(days=7)
+    reports = state.setdefault("cma_reports_processed", {})
+    state["cma_reports_processed"] = {
+        key: timestamp
+        for key, timestamp in reports.items()
+        if (_parse_state_timestamp(str(timestamp)) or datetime.min.replace(tzinfo=UTC)) >= report_cutoff
+    }
+
+
+def _cloud_cma_request_count_today(state: dict[str, Any]) -> int:
+    today = datetime.now(UTC).date()
+    return sum(
+        1
+        for value in state.get("cma_requests", {}).values()
+        if (parsed := _parse_state_timestamp(str(value))) is not None and parsed.date() == today
+    )
+
+
+def request_cloud_cma_for_deal(
+    deal: PropertyDeal,
+    valuation_cfg: dict[str, Any],
+    state: dict[str, Any],
+    request_budget: list[int],
+) -> ValuationResult:
+    """Request at most one report per address within the configured TTL."""
+    request_key = cma_address_hash(deal.address)
+    requests = state.setdefault("cma_requests", {})
+    if request_key in requests:
+        pdf_url = fetch_result(
+            str(valuation_cfg.get("callback_base_url") or ""),
+            request_key,
+            str(valuation_cfg.get("callback_secret") or ""),
+        )
+        if not pdf_url:
+            return pending_valuation("Cloud CMA report already requested")
+
+        pdf_bytes = download_cloud_cma_pdf(pdf_url)
+        max_bytes = int(valuation_cfg.get("max_report_mb", 80)) * 1024 * 1024
+        if len(pdf_bytes) > max_bytes:
+            raise ValueError("Cloud CMA PDF exceeds configured size limit")
+        payload = parse_cloud_cma_pdf(pdf_bytes, requested_address=deal.address)
+        facts = extract_deal_facts(
+            address=deal.address,
+            city=deal.city,
+            price=deal.price,
+            summary=deal.summary,
+        )
+        subject = dict(payload.get("subjectProperty") or {})
+        subject.update(
+            {
+                key: value
+                for key, value in {
+                    "squareFootage": facts.sqft,
+                    "beds": facts.beds,
+                    "baths": facts.baths,
+                    "yearBuilt": facts.year_built,
+                }.items()
+                if value is not None
+            }
+        )
+        payload["subjectProperty"] = subject
+        valuation = calculate_comp_valuation(payload, valuation_cfg)
+        delete_result(
+            str(valuation_cfg.get("callback_base_url") or ""),
+            request_key,
+            str(valuation_cfg.get("callback_secret") or ""),
+        )
+        state.setdefault("cma_reports_processed", {})[request_key] = datetime.now(UTC).isoformat()
+        return valuation
+    if request_budget[0] <= 0:
+        return pending_valuation("Cloud CMA request queue is rate limited")
+
+    facts = extract_deal_facts(
+        address=deal.address,
+        city=deal.city,
+        price=deal.price,
+        summary=deal.summary,
+    )
+    submission = request_quick_cma(
+        api_key=str(valuation_cfg.get("api_key") or ""),
+        address=deal.address,
+        callback_url=callback_delivery_url(
+            str(valuation_cfg.get("callback_base_url") or ""),
+            str(valuation_cfg.get("callback_secret") or ""),
+        ),
+        job_id=request_key,
+        sqft=facts.sqft,
+        beds=facts.beds,
+        baths=facts.baths,
+        min_listings=int(valuation_cfg.get("min_listings", 25)),
+        months_back=max(1, int(round(int(valuation_cfg.get("days_old", 180)) / 30))),
+        template=str(valuation_cfg.get("template") or "Web Leads"),
+    )
+    if not submission.accepted:
+        return unavailable_valuation(f"Cloud CMA request returned HTTP {submission.status_code}")
+
+    requests[request_key] = datetime.now(UTC).isoformat()
+    request_budget[0] -= 1
+    return pending_valuation("Cloud CMA report requested")
+
+
 def normalize_list(value: Any) -> list[str]:
     if not value:
         return []
@@ -665,7 +810,68 @@ def row_snippets(row: dict[str, Any], content_columns: list[str]) -> list[str]:
     return snippets
 
 
-def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
+def build_deal_alert(
+    *,
+    deal: PropertyDeal,
+    label: str,
+    from_header: str,
+    subject: str,
+    received_at: str,
+    screening_cfg: dict[str, Any],
+    valuation: ValuationResult | None = None,
+) -> AlertItem:
+    facts = extract_deal_facts(
+        address=deal.address,
+        city=deal.city,
+        price=deal.price,
+        summary=deal.summary,
+    )
+    screening = screen_deal(facts, valuation, screening_cfg)
+    lines = [f"Mailbox: {label}", f"From: {from_header}", f"Subject: {subject}"]
+    if received_at:
+        lines.append(f"Received: {received_at}")
+    lines.append(f"Address: {deal.address}")
+    if deal.price:
+        lines.append(f"Ask: {deal.price}")
+    lines.append(format_screening_result(screening))
+    if deal.details_url:
+        lines.append(f"Details: {deal.details_url}")
+    if deal.image_url:
+        lines.append(f"Image: {deal.image_url}")
+    if deal.summary:
+        lines.append(f"Info: {deal.summary[:260]}")
+
+    # Property + ask dedupes the same lead across different wholesalers while
+    # allowing a materially changed asking price to generate a new alert.
+    item_id = deal_item_id(deal)
+    return AlertItem(
+        source=f"email:{label}",
+        item_id=item_id,
+        title=f"{screening.label}: {deal.city}",
+        body="\n".join(lines),
+        city=deal.city,
+    )
+
+
+def deal_item_id(deal: PropertyDeal) -> str:
+    facts = extract_deal_facts(
+        address=deal.address,
+        city=deal.city,
+        price=deal.price,
+        summary=deal.summary,
+    )
+    normalized_ask = str(facts.ask or deal.price).strip().lower()
+    return stable_id(["deal", normalize_address_key(deal.address), normalized_ask])
+
+
+def scan_email_account(
+    account_cfg: dict[str, Any],
+    screening_cfg: dict[str, Any] | None = None,
+    valuation_cfg: dict[str, Any] | None = None,
+    seen: set[str] | None = None,
+    state: dict[str, Any] | None = None,
+    request_budget: list[int] | None = None,
+) -> list[AlertItem]:
     host = account_cfg["imap_host"]
     username = account_cfg["username"]
     password = account_cfg["password"]
@@ -676,6 +882,13 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
     sender_subject_filters = account_cfg.get("sender_subject_filters", {})
     cities = account_cfg.get("cities", [])
     label = account_cfg.get("label") or username or host
+    screening_cfg = screening_cfg or {}
+    valuation_cfg = valuation_cfg or {}
+    seen = seen or set()
+    state = state if state is not None else {"cma_requests": {}}
+    request_budget = request_budget if request_budget is not None else [0]
+    valuation_enabled = bool(valuation_cfg.get("enabled", False))
+    screening_enabled = bool(screening_cfg.get("enabled", valuation_enabled))
     cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
 
     results: list[AlertItem] = []
@@ -735,8 +948,47 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
             if not city:
                 continue
 
-            city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
             matched += 1
+
+            if screening_enabled and valuation_enabled and parsed_deals:
+                for deal in parsed_deals:
+                    item_id = deal_item_id(deal)
+                    if item_id in seen:
+                        continue
+                    try:
+                        valuation = request_cloud_cma_for_deal(
+                            deal,
+                            valuation_cfg,
+                            state,
+                            request_budget,
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[WARN] Cloud CMA request failed for {deal.address} "
+                            f"({exc.__class__.__name__}: {exc}).",
+                            file=sys.stderr,
+                        )
+                        valuation = unavailable_valuation(str(exc))
+
+                    # Pending requests are intentionally silent. The original
+                    # deal remains unseen and will be combined with the report
+                    # on the next scheduled run.
+                    if valuation.status != "complete":
+                        continue
+                    results.append(
+                        build_deal_alert(
+                            deal=deal,
+                            label=label,
+                            from_header=from_header,
+                            subject=subject,
+                            received_at=received_at,
+                            screening_cfg=screening_cfg,
+                            valuation=valuation,
+                        )
+                    )
+                continue
+
+            city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
 
             msg_key = msg.get("Message-ID", "") or str(msg_id, errors="ignore")
             item_id = stable_id(["email", label, msg_key, subject, city])
@@ -791,15 +1043,37 @@ def scan_email_account(account_cfg: dict[str, Any]) -> list[AlertItem]:
         )
 
 
-def scan_emails(config: dict[str, Any]) -> list[AlertItem]:
+def scan_emails(
+    config: dict[str, Any],
+    seen: set[str] | None = None,
+    state: dict[str, Any] | None = None,
+) -> list[AlertItem]:
     email_cfg = config.get("email", {})
     results: list[AlertItem] = []
     accounts = collect_email_accounts(config)
     if not accounts:
         return []
 
+    screening_cfg = config.get("screening", {})
+    valuation_cfg = config.get("valuation", {})
+    state = state if state is not None else {}
+    prune_cma_state(state, valuation_cfg)
+
+    max_per_run = max(0, int(valuation_cfg.get("max_requests_per_run", 3)))
+    max_per_day = max(0, int(valuation_cfg.get("max_requests_per_day", 10)))
+    remaining_today = max(0, max_per_day - _cloud_cma_request_count_today(state))
+    request_budget = [min(max_per_run, remaining_today)]
     for account_cfg in accounts:
-        results.extend(scan_email_account(account_cfg))
+        results.extend(
+            scan_email_account(
+                account_cfg,
+                screening_cfg,
+                valuation_cfg,
+                seen,
+                state,
+                request_budget,
+            )
+        )
     return results
 
 
@@ -983,7 +1257,8 @@ def main() -> int:
 
     state_path = Path(config.get("state_file", "state/monitor_state.json"))
     state = load_state(state_path)
-    seen = set(state.get("seen", []))
+    seen_order = list(dict.fromkeys(state.get("seen", [])))
+    seen = set(seen_order)
 
     telegram_cfg = config.get("telegram", {})
     twilio_cfg = config.get("twilio", {})
@@ -992,7 +1267,7 @@ def main() -> int:
 
     matches: list[AlertItem] = []
     try:
-        matches.extend(scan_emails(config))
+        matches.extend(scan_emails(config, seen, state))
     except Exception as exc:
         print(
             f"[WARN] Email scan failed ({exc.__class__.__name__}: {exc}). Continuing.",
@@ -1015,10 +1290,12 @@ def main() -> int:
             print(f"[DRY RUN] {item.title}\n{item.body}\n")
 
         seen.add(item.item_id)
+        seen_order.append(item.item_id)
         sent += 1
 
     # Keep state bounded.
-    state["seen"] = list(seen)[-100:]
+    max_seen = max(100, int(config.get("state_max_seen", 2000)))
+    state["seen"] = seen_order[-max_seen:]
     save_state(state_path, state)
 
     print(f"Processed {len(matches)} matches, sent {sent} new alerts.")
