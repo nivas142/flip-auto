@@ -100,5 +100,9 @@
     "0d923d66cc07ae260b6d4b6af2d17ffedef58b17a93d8495c95055b430f3d0e8",
     "b79d2019881ded6a950798c6b13d126e376d02ee73a944074f0ffcfc4abcc19c",
     "f7a095ecfd6afef8fdd5b61f419d83ae7d47be69d2b772f277341a6af49a405f"
-  ]
+  ],
+  "cma_requests": {
+    "73af116ca246329957b4c8922e8522c22dc599b89bb8ccbd393d3b6e70006e05": "2026-09-16T09:10:11.350006+00:00"
+  },
+  "cma_reports_processed": {}
 }
