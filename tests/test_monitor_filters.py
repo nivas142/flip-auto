@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import io
 import imaplib
+import json
+import os
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -232,6 +235,103 @@ class MonitorFilterTests(unittest.TestCase):
         )
 
         self.assertEqual(first_alert.item_id, second_alert.item_id)
+
+    def test_only_green_and_yellow_screening_results_are_notifiable(self):
+        valuation = ValuationResult(
+            status="complete",
+            source="cloud_cma_closed_comps",
+            reason="",
+            arv_low=500_000,
+            arv_likely=515_000,
+            arv_high=530_000,
+            confidence="medium",
+            subject_square_footage=1_800,
+            comparables=(),
+        )
+        common = {
+            "city": "Mesa",
+            "address": "123 Main St, Mesa, AZ 85201",
+            "details_url": "",
+            "image_url": "",
+            "summary": "1,800 sqft 3 beds 2 baths built 1998",
+        }
+
+        candidate = monitor.build_deal_alert(
+            deal=monitor.PropertyDeal(price="$350,000", **common),
+            label="gmail",
+            from_header="deals@example.com",
+            subject="Candidate",
+            received_at="",
+            screening_cfg={"enabled": True},
+            valuation=valuation,
+        )
+        preliminary_pass = monitor.build_deal_alert(
+            deal=monitor.PropertyDeal(price="$470,000", **common),
+            label="gmail",
+            from_header="deals@example.com",
+            subject="Pass",
+            received_at="",
+            screening_cfg={"enabled": True},
+            valuation=valuation,
+        )
+
+        self.assertTrue(candidate.notify)
+        self.assertIn("CMA CANDIDATE", candidate.title)
+        self.assertFalse(preliminary_pass.notify)
+        self.assertIn("PRELIMINARY PASS", preliminary_pass.title)
+
+    def test_suppressed_result_is_recorded_without_sending(self):
+        suppressed = monitor.AlertItem(
+            source="email:gmail",
+            item_id="suppressed-deal-id",
+            title="🔴 PRELIMINARY PASS: Mesa",
+            body="Screen: 🔴 PRELIMINARY PASS",
+            city="Mesa",
+            notify=False,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            previous_cwd = os.getcwd()
+            try:
+                os.chdir(temp_dir)
+                with open("config.yaml", "w", encoding="utf-8") as config_file:
+                    config_file.write(
+                        "state_file: state.json\n"
+                        "telegram:\n  enabled: false\n"
+                        "twilio:\n  enabled: false\n"
+                    )
+                with patch.object(monitor, "scan_emails", return_value=[suppressed]), patch.object(
+                    monitor, "scan_sheet", return_value=[]
+                ), patch.object(monitor, "send_alert") as send_alert:
+                    result = monitor.main()
+
+                with open("state.json", encoding="utf-8") as state_file:
+                    state = json.load(state_file)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(result, 0)
+        send_alert.assert_not_called()
+        self.assertIn("suppressed-deal-id", state["seen"])
+
+    def test_unscreened_sheet_match_is_silent_when_screening_is_enabled(self):
+        config = {
+            "screening": {"enabled": True},
+            "gsheet": {
+                "enabled": True,
+                "cities": ["Mesa"],
+                "city_column": "city",
+                "row_id_column": "id",
+                "content_columns": ["address", "price"],
+            },
+        }
+        rows = [{"id": "1", "city": "Mesa", "address": "123 Main St", "price": "$400,000"}]
+
+        with patch.object(monitor, "load_public_sheet_rows", return_value=(rows, "test-sheet")):
+            results = monitor.scan_sheet(config)
+
+        self.assertEqual(len(results), 1)
+        self.assertFalse(results[0].notify)
 
     def test_account_can_clear_inherited_email_filters(self):
         config = {
