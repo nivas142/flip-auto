@@ -6,3 +6,5 @@ workers_dev = true
 [[kv_namespaces]]
 binding = "CMA_RESULTS"
 id = "__KV_NAMESPACE_ID__"
+
+# Trigger initial deployment
