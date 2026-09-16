@@ -5,7 +5,7 @@ This project includes a Python program (`monitor.py`) that:
 - Checks IMAP email for configured sender addresses.
 - Reads email subject/body and matches configured cities.
 - Checks a Google Sheet for matching city rows.
-- Sends Telegram alerts for new matches (Twilio optional fallback).
+- Sends Telegram alerts only for green/yellow pre-screen results (Twilio optional fallback).
 - Stores sent IDs in a local state file to prevent duplicate texts.
 - Extracts ask, rehab, sqft, beds/baths, year built, and risk flags.
 - Calculates a configurable first-pass profit, basis percentage, MAO, and lead score.
@@ -66,6 +66,11 @@ Important safeguards:
 - Requests are capped per run/day and cached by an opaque address hash for 30
   days. Raw MLS report data is not committed to the repository or sent to Telegram.
 - Missing ask or independent comp ARV produces `VALUATION REQUIRED` rather than a guessed result.
+- Telegram sends `CMA CANDIDATE`, `HIGH-RISK REVIEW`, and `PRICE DEPENDENT`
+  results. `PRELIMINARY PASS` and `VALUATION REQUIRED` results are suppressed
+  but recorded as processed so they do not generate repeated reports or alerts.
+- While pre-screening is enabled, city-only email matches and unscreened Google
+  Sheet rows are also recorded without sending Telegram notifications.
 - Rehab is labeled as provided or assumed. When absent, the engine uses configured
   dollars per sqft, then a flat fallback when sqft is also missing.
 - Structured multi-property emails produce one alert per matching property, even
