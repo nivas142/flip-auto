@@ -1,0 +1,28 @@
+name: One-time CMA Callback Smoke Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cma-callback-smoke-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  callback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post synthetic Cloud CMA callback
+        env:
+          CALLBACK_BASE_URL: ${{ vars.CLOUD_CMA_CALLBACK_BASE_URL }}
+          CALLBACK_SECRET: ${{ secrets.CLOUD_CMA_WEBHOOK_SECRET }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$CALLBACK_BASE_URL"
+          test ${#CALLBACK_SECRET} -ge 32
+          job_id="$(printf 'flip-auto-callback-smoke:%s' "$SOURCE_SHA" | sha256sum | awk '{print $1}')"
+          status="$(curl --fail-with-body --silent --show-error             --output /dev/null --write-out '%{http_code}'             --request POST             --data-urlencode "job_id=$job_id"             --data-urlencode "pdf_url=https://cloudcma.com/pdf/53882d4d8b32c72fe05cf1bd9b053817"             "${CALLBACK_BASE_URL%/}/callback/$CALLBACK_SECRET")"
+          test "$status" = "204"
