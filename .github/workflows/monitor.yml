@@ -22,6 +22,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # A callback can queue while another monitor run is committing state.
+          # Check out the latest branch tip when this job actually starts rather
+          # than the older SHA captured when workflow_dispatch was created.
+          ref: main
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
