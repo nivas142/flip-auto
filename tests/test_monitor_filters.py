@@ -12,6 +12,7 @@ from email.utils import format_datetime
 from unittest.mock import patch
 
 import monitor
+from cloud_cma import CloudCmaReportTooLarge
 from valuation import ValuationResult
 
 
@@ -150,6 +151,41 @@ class MonitorFilterTests(unittest.TestCase):
         self.assertEqual(result, expected)
         delete_mock.assert_called_once()
         self.assertIn(request_key, state["cma_reports_processed"])
+
+    def test_oversized_callback_is_deleted_and_not_downloaded_again(self):
+        deal = monitor.PropertyDeal(
+            city="Mesa",
+            address="6447 E University Dr, Mesa, AZ 85205",
+            price="$300,000",
+            details_url="",
+            image_url="",
+            summary="1,800 sqft",
+        )
+        request_key = monitor.cma_address_hash(deal.address)
+        state = {"cma_requests": {request_key: datetime.now(timezone.utc).isoformat()}}
+        cfg = {
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
+            "max_report_mb": 200,
+        }
+
+        with (
+            patch.object(monitor, "fetch_result", return_value="https://cloudcma.com/pdf/large"),
+            patch.object(
+                monitor,
+                "download_cloud_cma_pdf",
+                side_effect=CloudCmaReportTooLarge("too large"),
+            ) as download_mock,
+            patch.object(monitor, "delete_result") as delete_mock,
+        ):
+            first = monitor.request_cloud_cma_for_deal(deal, cfg, state, [0])
+            second = monitor.request_cloud_cma_for_deal(deal, cfg, state, [0])
+
+        self.assertEqual(first.status, "unavailable")
+        self.assertEqual(second.status, "unavailable")
+        self.assertEqual(download_mock.call_count, 1)
+        delete_mock.assert_called_once()
+        self.assertIn(request_key, state["cma_reports_rejected"])
 
     def test_screening_emits_each_matching_city_deal(self):
         raw_message = build_html_email_bytes(
