@@ -25,6 +25,12 @@ META_REFRESH_RE = re.compile(
     r"url=(https?://[^\"'<>\s]+\.pdf(?:\?[^\"'<>\s]+)?)",
     re.IGNORECASE,
 )
+DEFAULT_MAX_REPORT_BYTES = 200 * 1024 * 1024
+MAX_WRAPPER_BYTES = 2 * 1024 * 1024
+
+
+class CloudCmaReportTooLarge(ValueError):
+    """Raised when a Cloud CMA response exceeds the configured safe ceiling."""
 
 
 @dataclass(frozen=True)
@@ -97,12 +103,45 @@ def request_quick_cma(
     return CloudCmaSubmission(accepted=200 <= status < 300, status_code=status)
 
 
-def download_cloud_cma_pdf(url: str, *, timeout: int = 90) -> bytes:
+def _read_limited(response: Any, max_bytes: int) -> bytes:
+    """Read a response incrementally without buffering beyond the limit."""
+    raw_length = str(response.headers.get("Content-Length", "")).strip()
+    if raw_length.isdigit() and int(raw_length) > max_bytes:
+        raise CloudCmaReportTooLarge(
+            f"Cloud CMA report is {int(raw_length):,} bytes; limit is {max_bytes:,}"
+        )
+
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = response.read(min(1024 * 1024, max_bytes + 1 - total))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > max_bytes:
+            raise CloudCmaReportTooLarge(
+                f"Cloud CMA response exceeded the {max_bytes:,}-byte limit"
+            )
+    return b"".join(chunks)
+
+
+def download_cloud_cma_pdf(
+    url: str,
+    *,
+    timeout: int = 90,
+    max_bytes: int = DEFAULT_MAX_REPORT_BYTES,
+) -> bytes:
     """Download a Cloud CMA PDF, including its HTML meta-refresh wrapper."""
+    if max_bytes <= 0:
+        raise ValueError("Cloud CMA PDF size limit must be positive")
     request = Request(url, headers={"User-Agent": "flip-auto/1.0"})
     with urlopen(request, timeout=timeout) as response:
         content_type = str(response.headers.get("Content-Type", "")).lower()
-        body = response.read()
+        response_limit = max_bytes if "application/pdf" in content_type else min(
+            max_bytes, MAX_WRAPPER_BYTES
+        )
+        body = _read_limited(response, response_limit)
     if body.startswith(b"%PDF") or "application/pdf" in content_type:
         return body
 
@@ -113,7 +152,7 @@ def download_cloud_cma_pdf(url: str, *, timeout: int = 90) -> bytes:
     direct_url = match.group(1).replace("&amp;", "&")
     direct_request = Request(direct_url, headers={"User-Agent": "flip-auto/1.0"})
     with urlopen(direct_request, timeout=timeout) as response:
-        pdf = response.read()
+        pdf = _read_limited(response, max_bytes)
     if not pdf.startswith(b"%PDF"):
         raise ValueError("Cloud CMA returned a non-PDF report")
     return pdf
