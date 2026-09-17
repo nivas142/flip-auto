@@ -35,6 +35,7 @@ import yaml
 from bs4 import BeautifulSoup
 
 from cloud_cma import (
+    CloudCmaReportTooLarge,
     download_cloud_cma_pdf,
     parse_cloud_cma_pdf,
     request_quick_cma,
@@ -438,6 +439,13 @@ def prune_cma_state(state: dict[str, Any], valuation_cfg: dict[str, Any]) -> Non
         if (_parse_state_timestamp(str(timestamp)) or datetime.min.replace(tzinfo=UTC)) >= report_cutoff
     }
 
+    rejected = state.setdefault("cma_reports_rejected", {})
+    state["cma_reports_rejected"] = {
+        key: timestamp
+        for key, timestamp in rejected.items()
+        if (_parse_state_timestamp(str(timestamp)) or datetime.min.replace(tzinfo=UTC)) >= cutoff
+    }
+
 
 def _cloud_cma_request_count_today(state: dict[str, Any]) -> int:
     today = datetime.now(UTC).date()
@@ -457,6 +465,8 @@ def request_cloud_cma_for_deal(
     """Request at most one report per address within the configured TTL."""
     request_key = cma_address_hash(deal.address)
     requests = state.setdefault("cma_requests", {})
+    if request_key in state.setdefault("cma_reports_rejected", {}):
+        return unavailable_valuation("Cloud CMA report exceeded the safe download limit")
     if request_key in requests:
         pdf_url = fetch_result(
             str(valuation_cfg.get("callback_base_url") or ""),
@@ -466,10 +476,20 @@ def request_cloud_cma_for_deal(
         if not pdf_url:
             return pending_valuation("Cloud CMA report already requested")
 
-        pdf_bytes = download_cloud_cma_pdf(pdf_url)
-        max_bytes = int(valuation_cfg.get("max_report_mb", 80)) * 1024 * 1024
-        if len(pdf_bytes) > max_bytes:
-            raise ValueError("Cloud CMA PDF exceeds configured size limit")
+        max_report_mb = max(1, int(valuation_cfg.get("max_report_mb", 200)))
+        max_bytes = max_report_mb * 1024 * 1024
+        try:
+            pdf_bytes = download_cloud_cma_pdf(pdf_url, max_bytes=max_bytes)
+        except CloudCmaReportTooLarge:
+            delete_result(
+                str(valuation_cfg.get("callback_base_url") or ""),
+                request_key,
+                str(valuation_cfg.get("callback_secret") or ""),
+            )
+            state.setdefault("cma_reports_rejected", {})[request_key] = datetime.now(UTC).isoformat()
+            return unavailable_valuation(
+                f"Cloud CMA report exceeded the {max_report_mb} MB safe download limit"
+            )
         payload = parse_cloud_cma_pdf(pdf_bytes, requested_address=deal.address)
         facts = extract_deal_facts(
             address=deal.address,
