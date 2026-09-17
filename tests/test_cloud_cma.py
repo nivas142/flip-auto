@@ -5,7 +5,12 @@ from datetime import date
 from unittest.mock import patch
 from urllib.parse import parse_qs
 
-from cloud_cma import parse_cloud_cma_pages, request_quick_cma
+from cloud_cma import (
+    CloudCmaReportTooLarge,
+    download_cloud_cma_pdf,
+    parse_cloud_cma_pages,
+    request_quick_cma,
+)
 from valuation import calculate_comp_valuation
 
 
@@ -37,6 +42,50 @@ Pool Features: None
 
 
 class CloudCmaTests(unittest.TestCase):
+    def test_download_rejects_content_length_over_limit_before_reading(self):
+        class FakeResponse:
+            headers = {"Content-Type": "application/pdf", "Content-Length": "101"}
+            read_called = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def read(self, _size=-1):
+                self.read_called = True
+                return b"%PDF"
+
+        response = FakeResponse()
+        with patch("cloud_cma.urlopen", return_value=response):
+            with self.assertRaises(CloudCmaReportTooLarge):
+                download_cloud_cma_pdf("https://cloudcma.com/pdf/test", max_bytes=100)
+        self.assertFalse(response.read_called)
+
+    def test_download_rejects_chunked_pdf_over_limit(self):
+        class FakeResponse:
+            headers = {"Content-Type": "application/pdf"}
+
+            def __init__(self):
+                self.body = b"%PDF-" + b"x" * 100
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def read(self, size=-1):
+                if not self.body:
+                    return b""
+                chunk, self.body = self.body[:size], self.body[size:]
+                return chunk
+
+        with patch("cloud_cma.urlopen", return_value=FakeResponse()):
+            with self.assertRaises(CloudCmaReportTooLarge):
+                download_cloud_cma_pdf("https://cloudcma.com/pdf/test", max_bytes=100)
+
     def test_quick_cma_uses_webhook_without_email_delivery(self):
         captured = {}
 
