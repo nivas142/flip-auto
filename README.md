@@ -39,6 +39,7 @@ valuation:
   max_requests_per_run: 1
   max_requests_per_day: 10
   request_ttl_days: 30
+  max_report_mb: 200
   max_radius: 1.0
   days_old: 180
   size_tolerance: 0.20
@@ -65,6 +66,9 @@ Important safeguards:
 - Automated comp scores are capped at 84, below the 85+ immediate tier.
 - Requests are capped per run/day and cached by an opaque address hash for 30
   days. Raw MLS report data is not committed to the repository or sent to Telegram.
+- PDF downloads are streamed with a 200 MB ceiling. Reports beyond that ceiling
+  are deleted from the callback queue and marked by opaque hash so scheduled runs
+  do not repeatedly download the same unusable report.
 - Missing ask or independent comp ARV produces `VALUATION REQUIRED` rather than a guessed result.
 - Telegram sends `CMA CANDIDATE`, `HIGH-RISK REVIEW`, and `PRICE DEPENDENT`
   results. `PRELIMINARY PASS` and `VALUATION REQUIRED` results are suppressed
