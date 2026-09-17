@@ -104,7 +104,8 @@ valuation:
   max_requests_per_run: 1
   max_requests_per_day: 10
   request_ttl_days: 30
-  max_report_mb: 80
+  # Cloud CMA reports include listing photos and commonly exceed 80 MB.
+  max_report_mb: 200
   max_radius: 1.0
   days_old: 180
   size_tolerance: 0.20
