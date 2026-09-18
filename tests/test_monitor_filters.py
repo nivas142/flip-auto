@@ -197,6 +197,12 @@ class MonitorFilterTests(unittest.TestCase):
                     <a href="https://example.com/mesa">Photos / Details</a></td></tr>
                   <tr><td>456 Oak Rd, Chandler, AZ 85224 ARV: $600K Price: $400,000
                     <a href="https://example.com/chandler">Photos / Details</a></td></tr>
+                  <tr><td>789 Desert Ave, Tucson, AZ 85701 Price: $225,000
+                    Marketed to Mesa investors
+                    <a href="https://example.com/tucson">Photos / Details</a></td></tr>
+                  <tr><td>900 County Rd, Maricopa, AZ 85138 Price: $250,000
+                    Serving Mesa and Maricopa County
+                    <a href="https://example.com/maricopa">Photos / Details</a></td></tr>
                 </table>
             """,
         )
@@ -225,7 +231,7 @@ class MonitorFilterTests(unittest.TestCase):
         )
         with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
             monitor, "request_cloud_cma_for_deal", return_value=independent
-        ):
+        ) as request_cma:
             results = monitor.scan_email_account(
                 account_cfg,
                 {"enabled": True},
@@ -234,6 +240,17 @@ class MonitorFilterTests(unittest.TestCase):
 
         self.assertEqual(len(results), 2)
         self.assertEqual({item.city for item in results}, {"Mesa", "Chandler"})
+        self.assertEqual(request_cma.call_count, 2)
+        requested_addresses = {
+            call.args[0].address for call in request_cma.call_args_list
+        }
+        self.assertEqual(
+            requested_addresses,
+            {
+                "123 Main St, Mesa, AZ 85201",
+                "456 Oak Rd, Chandler, AZ 85224",
+            },
+        )
 
     def test_structured_deal_id_dedupes_address_variants_across_sources(self):
         first = monitor.PropertyDeal(
