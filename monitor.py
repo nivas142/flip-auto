@@ -154,6 +154,24 @@ def contains_city(text: str, cities: list[str]) -> str | None:
     return None
 
 
+def configured_city_from_address(address: str, cities: list[str]) -> str | None:
+    """Return an allowed city only when it is the city component of the address."""
+    normalized_address = normalize_text(address)
+    for city in sorted(cities, key=len, reverse=True):
+        normalized_city = normalize_text(city)
+        if not normalized_city:
+            continue
+        city_pattern = re.escape(normalized_city).replace(r"\ ", r"\s+")
+        if re.search(
+            rf"(?:,\s*|\s+){city_pattern}(?:,\s*|\s+)[A-Z]{{2}}"
+            rf"(?:\s+\d{{5}}(?:-\d{{4}})?)?\b",
+            normalized_address,
+            flags=re.IGNORECASE,
+        ):
+            return city
+    return None
+
+
 def matches_any_filter(text: str, filters: list[str]) -> bool:
     if not filters:
         return True
@@ -301,7 +319,7 @@ def extract_property_deals_from_plain_text(msg: Message, cities: list[str]) -> l
             continue
         address = normalize_text(address_matches[-1].group(0))
 
-        city = contains_city(address, cities) or contains_city(window, cities)
+        city = configured_city_from_address(address, cities)
         if not city:
             continue
 
@@ -362,7 +380,7 @@ def extract_property_deals_from_email(msg: Message, cities: list[str]) -> list[P
             continue
 
         address = normalize_text(address_match.group(0))
-        city = contains_city(address, cities) or contains_city(card_text, cities)
+        city = configured_city_from_address(address, cities)
         if not city:
             continue
 
@@ -978,6 +996,11 @@ def scan_email_account(
 
             if screening_enabled and valuation_enabled and parsed_deals:
                 for deal in parsed_deals:
+                    # Defense in depth: never spend a CMA request or emit a
+                    # screening alert unless the address itself proves the city.
+                    approved_city = configured_city_from_address(deal.address, cities)
+                    if not approved_city or approved_city.casefold() != deal.city.casefold():
+                        continue
                     item_id = deal_item_id(deal)
                     if item_id in seen:
                         continue
