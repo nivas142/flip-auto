@@ -73,6 +73,29 @@ class FakeIMAP:
 
 
 class MonitorFilterTests(unittest.TestCase):
+    def test_ask_price_ignores_unit_price_and_uses_purchase_price(self):
+        raw_message = build_html_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New deal",
+            html="""
+                <table><tr><td>
+                  123 Main St, Mesa, AZ 85201
+                  Price: $120 / SF
+                  Purchase Price: $254,000
+                  <a href="https://example.com/mesa">Photos / Details</a>
+                </td></tr></table>
+            """,
+        )
+        message = monitor.message_from_bytes(raw_message)
+
+        deals = monitor.extract_property_deals_from_email(message, ["Mesa"])
+
+        self.assertEqual(len(deals), 1)
+        self.assertEqual(deals[0].price, "$254,000")
+
+    def test_ask_price_rejects_small_fee_as_property_price(self):
+        self.assertEqual(monitor.extract_ask_price("Price: $120 processing fee"), "")
+
     def test_cloud_cma_request_is_deduped_without_persisting_raw_address(self):
         deal = monitor.PropertyDeal(
             city="Gilbert",
