@@ -73,6 +73,29 @@ class FakeIMAP:
 
 
 class MonitorFilterTests(unittest.TestCase):
+    def test_ask_price_ignores_unit_price_and_uses_purchase_price(self):
+        raw_message = build_html_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New deal",
+            html="""
+                <table><tr><td>
+                  123 Main St, Mesa, AZ 85201
+                  Price: $120 / SF
+                  Purchase Price: $254,000
+                  <a href="https://example.com/mesa">Photos / Details</a>
+                </td></tr></table>
+            """,
+        )
+        message = monitor.message_from_bytes(raw_message)
+
+        deals = monitor.extract_property_deals_from_email(message, ["Mesa"])
+
+        self.assertEqual(len(deals), 1)
+        self.assertEqual(deals[0].price, "$254,000")
+
+    def test_ask_price_rejects_small_fee_as_property_price(self):
+        self.assertEqual(monitor.extract_ask_price("Price: $120 processing fee"), "")
+
     def test_cloud_cma_request_is_deduped_without_persisting_raw_address(self):
         deal = monitor.PropertyDeal(
             city="Gilbert",
@@ -197,6 +220,12 @@ class MonitorFilterTests(unittest.TestCase):
                     <a href="https://example.com/mesa">Photos / Details</a></td></tr>
                   <tr><td>456 Oak Rd, Chandler, AZ 85224 ARV: $600K Price: $400,000
                     <a href="https://example.com/chandler">Photos / Details</a></td></tr>
+                  <tr><td>789 Desert Ave, Tucson, AZ 85701 Price: $225,000
+                    Marketed to Mesa investors
+                    <a href="https://example.com/tucson">Photos / Details</a></td></tr>
+                  <tr><td>900 County Rd, Maricopa, AZ 85138 Price: $250,000
+                    Serving Mesa and Maricopa County
+                    <a href="https://example.com/maricopa">Photos / Details</a></td></tr>
                 </table>
             """,
         )
@@ -225,7 +254,7 @@ class MonitorFilterTests(unittest.TestCase):
         )
         with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
             monitor, "request_cloud_cma_for_deal", return_value=independent
-        ):
+        ) as request_cma:
             results = monitor.scan_email_account(
                 account_cfg,
                 {"enabled": True},
@@ -234,6 +263,17 @@ class MonitorFilterTests(unittest.TestCase):
 
         self.assertEqual(len(results), 2)
         self.assertEqual({item.city for item in results}, {"Mesa", "Chandler"})
+        self.assertEqual(request_cma.call_count, 2)
+        requested_addresses = {
+            call.args[0].address for call in request_cma.call_args_list
+        }
+        self.assertEqual(
+            requested_addresses,
+            {
+                "123 Main St, Mesa, AZ 85201",
+                "456 Oak Rd, Chandler, AZ 85224",
+            },
+        )
 
     def test_structured_deal_id_dedupes_address_variants_across_sources(self):
         first = monitor.PropertyDeal(
