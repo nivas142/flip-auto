@@ -92,9 +92,21 @@ ADDRESS_RE = re.compile(
 ADDRESS_FLEX_RE = re.compile(
     r"\b\d{1,6}\s+[A-Za-z0-9 .#'/-]{2,100}?(?:,\s*|\s+)[A-Za-z .'-]{2,40}(?:,\s*|\s+)[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b"
 )
-PRICE_RE = re.compile(r"\bPrice:\s*(\$[0-9][0-9,]*(?:\s*\+\s*[^•\n]+)?)", flags=re.IGNORECASE)
+ASK_PRICE_LABELS = (
+    "all-in price",
+    "wholesale price",
+    "asking price",
+    "ask price",
+    "purchase price",
+    "contract price",
+    "cash price",
+    "sale price",
+    "price",
+)
+ASK_MONEY_RE = r"\$\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?\s*[kKmM]?"
 PLAIN_PRICE_RE = re.compile(
-    r"\b(?:All-in\s+Price|Wholesale\s+Price|Price)\s*:\s*(\$[0-9][0-9,]*(?:\.[0-9]{2})?)",
+    rf"\b(?:{'|'.join(re.escape(label) for label in ASK_PRICE_LABELS)})"
+    rf"\s*:\s*(?P<amount>{ASK_MONEY_RE})",
     flags=re.IGNORECASE,
 )
 URL_RE = re.compile(r"https?://[^\s\])>]+", flags=re.IGNORECASE)
@@ -120,6 +132,49 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
 
 def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
+
+
+def _ask_amount_in_dollars(value: str) -> int | None:
+    match = re.fullmatch(
+        r"\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*([kKmM]?)",
+        normalize_text(value),
+    )
+    if not match:
+        return None
+    amount = float(match.group(1).replace(",", ""))
+    suffix = match.group(2).lower()
+    if suffix == "k":
+        amount *= 1_000
+    elif suffix == "m":
+        amount *= 1_000_000
+    return round(amount)
+
+
+def _is_plausible_ask_amount(value: str, trailing: str = "") -> bool:
+    if re.match(
+        r"\s*(?:/|per\s+)(?:sf|sq\.?\s*ft\.?|sqft|month|mo)\b",
+        trailing,
+        flags=re.IGNORECASE,
+    ):
+        return False
+    amount_in_dollars = _ask_amount_in_dollars(value)
+    return amount_in_dollars is not None and amount_in_dollars >= 10_000
+
+
+def extract_ask_price(text: str) -> str:
+    """Extract a plausible whole-property ask, never a unit price or small fee."""
+    normalized = normalize_text(text)
+    for label in ASK_PRICE_LABELS:
+        pattern = re.compile(
+            rf"\b{re.escape(label)}\s*:\s*(?P<amount>{ASK_MONEY_RE})",
+            flags=re.IGNORECASE,
+        )
+        for match in pattern.finditer(normalized):
+            trailing = normalized[match.end() : match.end() + 30]
+            amount = normalize_text(match.group("amount"))
+            if _is_plausible_ask_amount(amount, trailing):
+                return amount
+    return ""
 
 
 def is_bad_local_proxy(value: str) -> bool:
@@ -310,6 +365,11 @@ def extract_property_deals_from_plain_text(msg: Message, cities: list[str]) -> l
     seen_addresses: set[str] = set()
 
     for price_match in PLAIN_PRICE_RE.finditer(plain_text):
+        price = normalize_text(price_match.group("amount"))
+        if not _is_plausible_ask_amount(
+            price, plain_text[price_match.end() : price_match.end() + 30]
+        ):
+            continue
         window_start = max(0, price_match.start() - 700)
         window_end = min(len(plain_text), price_match.end() + 700)
         window = plain_text[window_start:window_end]
@@ -332,7 +392,6 @@ def extract_property_deals_from_plain_text(msg: Message, cities: list[str]) -> l
         detail_link_match = URL_RE.search(after_price)
         details_url = normalize_text(detail_link_match.group(0)) if detail_link_match else ""
 
-        price = normalize_text(price_match.group(1))
         summary = normalize_text(window.replace(address, "", 1))[:260]
         deals.append(
             PropertyDeal(
@@ -389,8 +448,7 @@ def extract_property_deals_from_email(msg: Message, cities: list[str]) -> list[P
             continue
         seen_addresses.add(key)
 
-        price_match = PRICE_RE.search(card_text)
-        price = normalize_text(price_match.group(1)) if price_match else ""
+        price = extract_ask_price(card_text)
         details_url = normalize_text(str(link.get("href", "")))
 
         image_url = ""
