@@ -218,6 +218,15 @@ creates the job, pauses it, verifies `PAUSED`, and only then grants job-specific
 invocation. Stop if anything fails; do not manually grant invocation to an
 unpaused job. It schedules every 30 minutes in `America/Phoenix` once resumed.
 
+The setup retries brief service-account propagation failures. If a previous
+attempt created the scheduler account but stopped before completion, rerun with
+`--apply --recover-existing-sa`. Recovery accepts only the account and schedule
+marked by this script, verifies their target settings and IAM, and never resumes
+the schedule. Unexpected resources or broader invocation grants require review.
+After a successful setup, do not rerun the helper; inspect or resume the existing
+paused schedule instead.
+This helper does not change the container image or production monitor.
+
 After approving the shadow comparison window, activate it explicitly:
 
 ```bash
