@@ -32,6 +32,31 @@ only that execution's replay result logs. It stops if the replay job already
 exists. Inspect that exact job before deciding whether another execution is
 needed; do not recreate or update it blindly after an interrupted command.
 
+## Recover an interrupted status or log read
+
+If setup already created an execution and the final log read timed out, use the
+same execution name from the output. Do not run `--apply` again. For example:
+
+```bash
+python3 deploy/gcp/run-cma-replay.py --inspect flip-auto-cma-replay-bqn2j
+```
+
+`--inspect` only reads the project, exact execution, and its result logs. It
+verifies the execution's image and prints task status before querying logs. It
+does not need the adjacent replay script, so a standalone reviewed copy of this
+helper also supports recovery. It never creates, executes, updates, or deletes a
+job, and never reads secrets or shadow state.
+
+The log query is restricted to the execution's timestamps with a two-minute
+margin, reads newest entries first, and has a 35-second timeout. It retries a
+timeout or an empty log result once; permission failures are not retried. If logs
+remain unavailable, the command exits nonzero and reports that baseline
+verification is still unconfirmed. A successful task by itself is not proof that
+the expected valuation and alert decisions were reproduced. A later `--inspect`
+can recover the result without starting another Cloud Run execution.
+
+## Isolation
+
 No container rebuild is required. The helper uses the already deployed digest,
 one task, one CPU, 1 GiB RAM, no task retries, and a 15-minute task timeout. It
 overrides the new job's command with the reviewed replay script. This is necessary

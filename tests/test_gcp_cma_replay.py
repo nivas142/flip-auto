@@ -146,8 +146,11 @@ class FakeGcloud:
         self.jobs = [{"metadata": {"name": "flip-auto-shadow"}}]
         self.image = setup.IMAGE
         self.execution = {
-            "metadata": {"name": setup.JOB + "-abcde"},
-            "status": {"succeededCount": 1, "conditions": [{"type": "Completed", "status": "True"}]},
+            "metadata": {"name": setup.JOB + "-abcde", "creationTimestamp": "2026-09-26T16:45:00Z",
+                         "labels": {"run.googleapis.com/job": setup.JOB}},
+            "spec": {"template": {"spec": {"containers": [{"image": setup.IMAGE}]}}},
+            "status": {"succeededCount": 1, "conditions": [{"type": "Completed", "status": "True"}],
+                       "startTime": "2026-09-26T16:45:10Z", "completionTime": "2026-09-26T16:46:10Z"},
         }
         self.result = {"baseline_verified": True}
         self.logs = [{"textPayload": "[CMA_REPLAY] " + json.dumps(self.result)}]
@@ -223,7 +226,7 @@ class ReplaySetupTests(unittest.TestCase):
             setup.apply(setup.read_source(), cloud, io.StringIO())
         cloud = FakeGcloud()
         cloud.logs = []
-        with self.assertRaisesRegex(setup.SetupError, "no single result"):
+        with self.assertRaisesRegex(setup.SetupError, "No single replay result"):
             setup.apply(setup.read_source(), cloud, io.StringIO(), lambda _: None)
         cloud = FakeGcloud()
         cloud.logs = [{"textPayload": '[CMA_REPLAY] {"baseline_verified": false}'}]
@@ -240,7 +243,7 @@ class ReplaySetupTests(unittest.TestCase):
 
         cloud.run = run
         output = io.StringIO()
-        with self.assertRaisesRegex(setup.SetupError, "did not complete"):
+        with self.assertRaisesRegex(setup.SetupError, "Execute wait did not confirm"):
             setup.apply(setup.read_source(), cloud, output)
         self.assertIn("[CMA_REPLAY]", output.getvalue())
         self.assertNotIn("completed. Normal shadow state", output.getvalue())
@@ -256,6 +259,124 @@ class ReplaySetupTests(unittest.TestCase):
                 setup.apply(setup.read_source(), output=io.StringIO())
         self.assertEqual(run.call_count, 1)
         self.assertNotIn("private-detail", str(caught.exception))
+
+    def test_inspect_is_read_only_with_bounded_descending_logs(self):
+        cloud = FakeGcloud()
+        output = io.StringIO()
+        result = setup.inspect_execution(setup.JOB + "-abcde", cloud, output)
+        self.assertTrue(result["baseline_verified"])
+        self.assertEqual([args[:2] for args, _ in cloud.calls], [
+            ("projects", "describe"), ("run", "jobs"), ("logging", "read"),
+        ])
+        self.assertEqual(cloud.calls[1][0][:4], ("run", "jobs", "executions", "describe"))
+        args, options = cloud.calls[-1]
+        self.assertIn('--order=desc', args)
+        self.assertIn('--limit=10', args)
+        self.assertEqual(options["timeout"], 35)
+        self.assertIn('timestamp>="2026-09-26T16:43:10Z"', args[2])
+        self.assertIn('timestamp<="2026-09-26T16:48:10Z"', args[2])
+        self.assertLess(output.getvalue().index("task succeeded"), output.getvalue().index("[CMA_REPLAY]"))
+
+    def test_inspect_cli_does_not_need_an_adjacent_replay_source(self):
+        # Importing a directly downloaded /tmp helper must not resolve a repo
+        # ancestor or require scripts/gcp_cma_replay.py before parsing --inspect.
+        namespace = {"__file__": "/tmp/flip-auto-replay-inspect.py", "__name__": "standalone_replay"}
+        source = (ROOT / "deploy/gcp/run-cma-replay.py").read_text()
+        exec(compile(source, namespace["__file__"], "exec"), namespace)
+        with patch.object(setup, "inspect_execution", return_value={"baseline_verified": True}) as inspect:
+            with patch.dict(namespace, {"inspect_execution": inspect}), patch("sys.stdout", io.StringIO()):
+                self.assertEqual(namespace["main"](["--inspect", setup.JOB + "-abcde"]), 0)
+            inspect.assert_called_once_with(setup.JOB + "-abcde")
+
+    def test_inspect_rejects_wrong_resource_or_image_before_log_access(self):
+        for change in ("name", "label", "image", "timestamp", "project"):
+            with self.subTest(change=change):
+                cloud = FakeGcloud()
+                if change == "name":
+                    cloud.execution["metadata"]["name"] = "flip-auto-shadow-abcde"
+                elif change == "label":
+                    cloud.execution["metadata"]["labels"]["run.googleapis.com/job"] = "flip-auto-shadow"
+                elif change == "image":
+                    cloud.execution["spec"]["template"]["spec"]["containers"][0]["image"] = "different-image"
+                elif change == "timestamp":
+                    cloud.execution["status"]["startTime"] = "2026-09-26T16:45:10"
+                else:
+                    cloud.project["projectNumber"] = "123"
+                with self.assertRaisesRegex(setup.SetupError, "--inspect flip-auto-cma-replay-abcde"):
+                    setup.inspect_execution(setup.JOB + "-abcde", cloud, io.StringIO())
+                self.assertFalse(any(args[:2] == ("logging", "read") for args, _ in cloud.calls))
+        cloud = FakeGcloud()
+        with self.assertRaises(setup.SetupError):
+            setup.inspect_execution("flip-auto-shadow-abcde", cloud, io.StringIO())
+        self.assertEqual(cloud.calls, [])
+
+    def test_log_timeout_reports_task_status_but_never_replay_success(self):
+        cloud = FakeGcloud()
+        original = cloud.run
+        output = io.StringIO()
+
+        def timed_out(*args, **kwargs):
+            result = original(*args, **kwargs)
+            if args[:2] == ("logging", "read"):
+                self.assertIn("task succeeded", output.getvalue())
+                raise setup.GcloudTimeout("timed out")
+            return result
+
+        cloud.run = timed_out
+        with self.assertRaisesRegex(setup.SetupError, "baseline remains unconfirmed.*--inspect"):
+            setup.inspect_execution(setup.JOB + "-abcde", cloud, output, lambda _: None)
+        self.assertEqual(sum(args[:2] == ("logging", "read") for args, _ in cloud.calls), 2)
+        self.assertNotIn("completed. Normal shadow state", output.getvalue())
+
+    def test_log_timeout_retries_read_once_and_can_verify_existing_result(self):
+        cloud = FakeGcloud()
+        original = cloud.run
+
+        def timed_out_once(*args, **kwargs):
+            result = original(*args, **kwargs)
+            if args[:2] == ("logging", "read") and sum(
+                call[:2] == ("logging", "read") for call, _ in cloud.calls
+            ) == 1:
+                raise setup.GcloudTimeout("timed out")
+            return result
+
+        cloud.run = timed_out_once
+        self.assertTrue(setup.inspect_execution(
+            setup.JOB + "-abcde", cloud, io.StringIO(), lambda _: None,
+        )["baseline_verified"])
+        logs = [args for args, _ in cloud.calls if args[:2] == ("logging", "read")]
+        self.assertEqual(len(logs), 2)
+        self.assertEqual(logs[0], logs[1])
+
+    def test_log_permission_denial_is_not_retried_or_reported_as_success(self):
+        cloud = FakeGcloud()
+        original = cloud.run
+        output = io.StringIO()
+
+        def denied(*args, **kwargs):
+            result = original(*args, **kwargs)
+            if args[:2] == ("logging", "read"):
+                raise setup.SetupError("gcloud logging read failed; exit 1")
+            return result
+
+        cloud.run = denied
+        with self.assertRaisesRegex(setup.SetupError, "failed; exit 1.*--inspect"):
+            setup.inspect_execution(setup.JOB + "-abcde", cloud, output, lambda _: None)
+        self.assertEqual(sum(args[:2] == ("logging", "read") for args, _ in cloud.calls), 1)
+        self.assertNotIn("completed. Normal shadow state", output.getvalue())
+
+    def test_creation_timestamp_fallback_still_bounds_pending_execution_logs(self):
+        cloud = FakeGcloud()
+        cloud.execution["status"].pop("startTime")
+        self.assertEqual(setup.log_time_bounds(cloud.execution), (
+            "2026-09-26T16:43:00Z", "2026-09-26T16:48:10Z",
+        ))
+
+    def test_error_log_cannot_be_hidden_by_a_baseline_result(self):
+        cloud = FakeGcloud()
+        cloud.logs.append({"textPayload": "[CMA_REPLAY_ERROR] fixture failure"})
+        with self.assertRaisesRegex(setup.SetupError, "emitted an error"):
+            setup.inspect_execution(setup.JOB + "-abcde", cloud, io.StringIO())
 
 
 if __name__ == "__main__":
