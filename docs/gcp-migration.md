@@ -224,7 +224,10 @@ scheduler with `bash deploy/gcp/create-paused-scheduler.sh --apply`. There is no
 atomic create-as-PAUSED API: the script creates a fresh, unprivileged invoker,
 creates the job, pauses it, verifies `PAUSED`, and only then grants job-specific
 invocation. Stop if anything fails; do not manually grant invocation to an
-unpaused job. It schedules every 30 minutes in `America/Phoenix` once resumed.
+unpaused job. Once resumed, it schedules every 30 minutes from 7:00 AM through
+6:00 PM daily in `America/Phoenix` (MST year-round), using
+`every 30 minutes from 07:00 to 18:00`. This includes the 6:00 PM run and excludes
+6:30 PM. Cloud Scheduler supports this groc format through its CLI/API.
 
 The setup retries brief service-account propagation failures. If a previous
 attempt created the scheduler account but stopped before completion, rerun with
@@ -234,6 +237,25 @@ the schedule. Unexpected resources or broader invocation grants require review.
 After a successful setup, do not rerun the helper; inspect or resume the existing
 paused schedule instead.
 This helper does not change the container image or production monitor.
+
+For an already-created all-day shadow schedule, update it in place; do not rerun
+the creation helper. This preserves its target, authentication, and enabled or
+paused state, and does not cancel a running Cloud Run execution:
+
+```bash
+gcloud scheduler jobs update http flip-auto-shadow \
+  --project=flip-auto --location=us-central1 \
+  --schedule='every 30 minutes from 07:00 to 18:00' \
+  --time-zone=America/Phoenix
+
+gcloud scheduler jobs describe flip-auto-shadow \
+  --project=flip-auto --location=us-central1 \
+  --format='yaml(state,schedule,timeZone,scheduleTime)'
+```
+
+The window controls scheduled starts, not completion times or manual executions.
+The separate unscheduled CMA replay is unaffected. The existing 48-hour mailbox
+lookback covers the overnight gap when scanning resumes at 7:00 AM.
 
 After approving the shadow comparison window, activate it explicitly:
 
@@ -273,6 +295,7 @@ Secret Manager, and Firestore resources still incur charges before later cleanup
 - [Job secret configuration](https://docs.cloud.google.com/run/docs/configuring/jobs/secrets)
 - [Schedule Cloud Run Jobs with OAuth](https://docs.cloud.google.com/run/docs/execute/jobs-on-schedule)
 - [Scheduler Job API: state is output-only](https://docs.cloud.google.com/scheduler/docs/reference/rest/v1/projects.locations.jobs)
+- [Scheduler groc format and time zones](https://docs.cloud.google.com/scheduler/docs/configuring/cron-job-schedules#alternative_job_format)
 - [Named Firestore databases and database IAM conditions](https://docs.cloud.google.com/firestore/native/docs/manage-databases)
 - [Disable single-field indexes](https://docs.cloud.google.com/sdk/gcloud/reference/firestore/indexes/fields/update)
 - [Secret-scoped IAM](https://docs.cloud.google.com/secret-manager/docs/access-control)
