@@ -177,6 +177,101 @@ Pool Features: None
         self.assertEqual(comp["formattedAddress"], "754 S SORRELL Lane, GILBERT, AZ 85296")
         self.assertNotEqual(comp["soldPrice"], comp["listPrice"])
 
+    def test_compact_pdf_spacing_preserves_closed_comp_facts(self):
+        normal = detail_page(
+            mls="7051111", address="754 S SORRELL Lane",
+            price=425_000, sqft=1_610, sold="8/7/26",
+        )
+        compact = (normal
+                   .replace("Lane Gilbert", "LaneGilbert")
+                   .replace("4 Beds 3.00 Baths", "4 Beds3.00 Baths")
+                   .replace("Year Built 1997", "Year Built1997")
+                   .replace("Days on market: 3", "Days on market:3"))
+        kwargs = {
+            "requested_address": "2010 E Arabian Dr, Gilbert, AZ 85296",
+            "as_of": date(2026, 9, 26),
+        }
+        expected = parse_cloud_cma_pages([MAP_PAGE, normal], **kwargs)
+        actual = parse_cloud_cma_pages([MAP_PAGE, compact], **kwargs)
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual["comparables"][0]["yearBuilt"], 1997)
+        self.assertEqual(
+            actual["comparables"][0]["formattedAddress"],
+            "754 S SORRELL Lane, Gilbert, AZ 85296",
+        )
+
+    def test_attached_numeric_labels_preserve_closed_price_provenance(self):
+        page = """754 S SORRELL LaneGilbert, AZ 85296
+MLS7051111
+Status: CLOSED
+Sold Price$425,000
+Bedrooms4
+Bathrooms3.0
+Living Area1,610
+Close of Escrow08/07/2026
+DOM3
+Year Built1997
+List Price$9,999,999
+Claimed ARV$8,888,888
+"""
+        kwargs = {
+            "requested_address": "2010 E Arabian Dr, Gilbert, AZ 85296",
+            "as_of": date(2026, 9, 26),
+        }
+        payload = parse_cloud_cma_pages([MAP_PAGE, page], **kwargs)
+        self.assertEqual(len(payload["comparables"]), 1)
+        comp = payload["comparables"][0]
+        self.assertEqual(comp["soldPrice"], 425_000)
+        self.assertEqual(comp["yearBuilt"], 1997)
+        self.assertEqual(comp["beds"], 4)
+        self.assertEqual(comp["baths"], 3)
+        self.assertEqual(comp["squareFootage"], 1_610)
+        self.assertEqual(comp["daysOnMarket"], 3)
+        self.assertEqual(comp["soldDate"], "2026-08-07")
+        for invalid_page in (
+            page.replace("Sold Price$425,000\n", ""),
+            page.replace("Status: CLOSED", "Status: ACTIVE"),
+            page.replace("Sold Price$425,000", "Unsold Price$425,000"),
+            page.replace("Sold Price$425,000", "Sold PriceEstimate$425,000"),
+        ):
+            with self.subTest(page=invalid_page):
+                self.assertEqual(
+                    parse_cloud_cma_pages([MAP_PAGE, invalid_page], **kwargs)["comparables"],
+                    [],
+                )
+
+    def test_compact_year_label_cannot_match_a_longer_word(self):
+        original = detail_page(
+            mls="7051111", address="754 S SORRELL Lane",
+            price=425_000, sqft=1_610, sold="8/7/26",
+        )
+        for invalid_label in ("Year BuiltEstimate1997", "PriorYear Built1997"):
+            with self.subTest(label=invalid_label):
+                payload = parse_cloud_cma_pages(
+                    [original.replace("Year Built 1997", invalid_label)],
+                    requested_address="2010 E Arabian Dr, Gilbert, AZ 85296",
+                    as_of=date(2026, 9, 26),
+                )
+                self.assertIsNone(payload["comparables"][0]["yearBuilt"])
+
+    def test_compact_address_does_not_split_inside_street_words(self):
+        for header in (
+            "754 S SORRELL LanewayGilbert, AZ 85296",
+            "754 S SORRELL DrivewayGilbert, AZ 85296",
+            "754 S SORRELL SaltLaneGilbert, AZ 85296",
+            "754 S SORRELL Drake, AZ 85296",
+        ):
+            with self.subTest(header=header):
+                page = detail_page(
+                    mls="7051111", address="754 S SORRELL Lane",
+                    price=425_000, sqft=1_610, sold="8/7/26",
+                ).replace("754 S SORRELL Lane Gilbert, AZ 85296", header)
+                payload = parse_cloud_cma_pages(
+                    [page], requested_address="2010 E Arabian Dr, Gilbert, AZ 85296",
+                    as_of=date(2026, 9, 26),
+                )
+                self.assertEqual(payload["comparables"][0]["formattedAddress"], "MLS #7051111")
+
     def test_cloud_cma_average_or_list_price_cannot_feed_arv(self):
         pages = [MAP_PAGE]
         for index, price in enumerate((425_000, 435_000, 445_000), start=1):

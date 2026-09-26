@@ -11,9 +11,12 @@ The report's map lists three bedrooms; the historical smoke-test input overrides
 that with four. Both are recorded explicitly. This discrepancy is retained for
 reproducibility and is not a verification of the property's bedroom count.
 
-The PDF and four calculation modules are pinned by SHA256. The module files
-were checked against production source commit
-`e8f1d5d7e86541cf7892d8da38c3ae8739d84480`. Results must match the fixed local
+The PDF and four calculation modules are pinned by SHA256. The original module
+files were checked against production source commit
+`e8f1d5d7e86541cf7892d8da38c3ae8739d84480`. The replay recognizes exactly two
+reviewed source profiles: that original deployed parser and the current
+version-3 parser with compact PDF spacing support. The other three modules
+must be identical. Results from either profile must match the same fixed local
 baseline, including selected comps, ARV range, screening results, and alert
 decisions. This is a comparison against the locally executed production source,
 not a separately observed GitHub workflow result.
@@ -42,7 +45,9 @@ python3 deploy/gcp/run-cma-replay.py --inspect flip-auto-cma-replay-bqn2j
 ```
 
 `--inspect` only reads the project, exact execution, and its result logs. It
-verifies the execution's image and prints task status before querying logs. It
+checks the execution's image and prints task status before querying logs. An
+omitted or mismatched image is reported separately and does not prevent the
+bounded diagnostic read, but exact image verification is required for success. It
 does not need the adjacent replay script, so a standalone reviewed copy of this
 helper also supports recovery. It never creates, executes, updates, or deletes a
 job, and never reads secrets or shadow state.
@@ -55,9 +60,52 @@ verification is still unconfirmed. A successful task by itself is not proof that
 the expected valuation and alert decisions were reproduced. A later `--inspect`
 can recover the result without starting another Cloud Run execution.
 
+## PDF parser compatibility check
+
+The September 26 failed replay reached the result-hash comparison. Locally,
+changing only pypdf from 6.10.0 to 6.19.0 reproduced a failure: the extracted
+text joined street suffixes to cities and numeric values to labels, losing
+comp addresses and years. This changed similarity weights and the upper ARV.
+It was not a harmless JSON ordering difference. The failed cloud execution
+did not report its dependency version, so that specific runtime cause still
+requires confirmation.
+
+Parser version 3 handles these compact fields without accepting longer-word
+label prefixes, list prices, or claimed ARV. It also rejects an explicitly
+active listing even if historical sold fields appear on its page. The retained
+PDF reproduces the original result hash under both pypdf versions with the fix.
+New dependency installations pin pypdf 6.19.0; an existing image is unchanged.
+
+From a reviewed checkout in Cloud Shell, run the fixed parser inside the exact
+deployed image. This reports that image's actual Python/pypdf versions and tests
+the fix without rebuilding or updating a Cloud Run job:
+
+```bash
+gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+docker run --rm --read-only --cap-drop=ALL \
+  --security-opt=no-new-privileges --workdir=/app --entrypoint=python \
+  --mount "type=bind,src=$PWD/cloud_cma.py,dst=/app/cloud_cma.py,readonly" \
+  --mount "type=bind,src=$PWD/scripts/gcp_cma_replay.py,dst=/app/gcp_cma_replay.py,readonly" \
+  us-central1-docker.pkg.dev/flip-auto/flip-auto/monitor@sha256:90854306a03c5856b9b7b7bac550b399db4e6b8fcdd9d9843a7d4cafadd4fce3 \
+  /app/gcp_cma_replay.py
+```
+
+The container receives no credentials or environment overrides. It downloads
+only the retained PDF and calculates locally. The read-only mounts replace the
+parser for this temporary container only, and the emitted `module_profile`
+must be `current-parser`. Success requires `baseline_verified: true` and the
+unchanged result hash below. This is a dependency compatibility check, not a
+new successful Cloud Run execution or a deployment of the fix. Rebuild and
+validate a separate candidate image before updating the scheduled shadow job.
+
+On a result mismatch, the runner emits `[CMA_REPLAY_DIAGNOSTIC]` with explicit
+selected comp facts, expected/actual hashes, and parser/dependency versions,
+then exits nonzero. This record is never a success marker. It does not print
+raw PDF text, email content, credentials, or environment variables.
+
 ## Isolation
 
-No container rebuild is required. The helper uses the already deployed digest,
+No container rebuild is required for the diagnostic replay. The helper uses the already deployed digest,
 one task, one CPU, 1 GiB RAM, no task retries, and a 15-minute task timeout. It
 overrides the new job's command with the reviewed replay script. This is necessary
 because the normal image entrypoint starts the mailbox runner.

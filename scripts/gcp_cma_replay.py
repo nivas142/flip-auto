@@ -12,6 +12,7 @@ import hashlib
 import importlib.metadata
 import json
 from pathlib import Path
+import platform
 import sys
 
 import cloud_cma
@@ -40,15 +41,24 @@ SCREENING_CONFIG = {
 EXPECTED_REPORT_SHA256 = "0fbe05a1ec669c6eb1548e6cc5fdf0ab4507a3e245309ae56225689677c40972"
 EXPECTED_RESULT_SHA256 = "7907073ef91c53d371fd5bf0a29b9932ec3829c6598ef2fb5211b98638b2ad7e"
 EXPECTED_MODULE_SHA256 = {
-    "cloud_cma": "1cb780240bc9f02b752a189d1418ddaddd49115fd530c2bb83ec0c8af09be22e",
+    "cloud_cma": "c8d05718135ed6656830ae2b91c6a07ef4e4cebc357cab3f02cc424cc3886e65",
     "valuation": "b8400c04f325f3c4b4296aa0d8113ea5e1fc09876cee998563053d9441a605f4",
     "deal_screening": "ceb04a8d3e68ab99ff1b267d6da94d31b4a6cac8affd675a1df8da1e970060b9",
     "monitor": "759f7dc616c3d01aebc36cef1f4f6e8858952d5407ec6c9840df5a2ca34003ec",
 }
+# Keep the original deployed parser as an explicitly reviewed diagnostic
+# profile. It must satisfy the SAME result baseline; accepting its source does
+# not accept changed calculations. The current profile also verifies a fixed
+# parser mounted read-only into the deployed container during migration.
+DEPLOYED_CLOUD_CMA_SHA256 = "1cb780240bc9f02b752a189d1418ddaddd49115fd530c2bb83ec0c8af09be22e"
 
 
 class ReplayError(RuntimeError):
     """Only fixed, non-secret diagnostic messages belong in this exception."""
+
+    def __init__(self, message, diagnostic=None):
+        super().__init__(message)
+        self.diagnostic = diagnostic
 
 
 def digest(value):
@@ -82,7 +92,8 @@ def run_replay(pdf_bytes=None):
         module.__name__: hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
         for module in (cloud_cma, deal_screening, monitor, valuation)
     }
-    if modules != EXPECTED_MODULE_SHA256:
+    deployed_modules = {**EXPECTED_MODULE_SHA256, "cloud_cma": DEPLOYED_CLOUD_CMA_SHA256}
+    if modules not in (EXPECTED_MODULE_SHA256, deployed_modules):
         raise ReplayError("Deployed calculation modules differ from the reviewed baseline")
     if pdf_bytes is None:
         pdf_bytes = cloud_cma.download_cloud_cma_pdf(
@@ -135,9 +146,7 @@ def run_replay(pdf_bytes=None):
         "synthetic_candidate_fixture": {"synthetic": True, **synthetic},
     }
     result_hash = digest(results)
-    if EXPECTED_RESULT_SHA256 and result_hash != EXPECTED_RESULT_SHA256:
-        raise ReplayError("Replay results differ from the reviewed baseline")
-    return {
+    diagnostic = {
         "fixture": "arabian-retained-cma-2026-09-26", "as_of": AS_OF.isoformat(),
         "report_subject": EXPECTED_REPORT_SUBJECT, "approved_subject_override": SUBJECT,
         "report_sha256": pdf_hash,
@@ -147,12 +156,24 @@ def run_replay(pdf_bytes=None):
             "valuation": VALUATION_CONFIG, "screening": SCREENING_CONFIG,
         }),
         "module_sha256": modules, "pypdf_version": importlib.metadata.version("pypdf"),
+        "module_profile": "current-parser" if modules == EXPECTED_MODULE_SHA256 else "original-deployed-parser",
+        "python_version": platform.python_version(),
         "parser_version": cloud_cma.CLOUD_CMA_PARSER_VERSION,
         "parse_diagnostics": payload.get("parseDiagnostics") or {},
         "results": results, "result_sha256": result_hash,
-        "baseline_verified": bool(EXPECTED_REPORT_SHA256 and EXPECTED_RESULT_SHA256),
+        "expected_result_sha256": EXPECTED_RESULT_SHA256,
+        # Explicit fields only: never include raw PDF text, URLs, email, or env.
+        "selected_comparables": [{key: comp[key] for key in (
+            "mls_number", "address", "price", "square_footage", "year_built",
+            "beds", "baths", "days_old",
+        )} for comp in selected],
+        "baseline_verified": False,
         "side_effects": {"alerts_sent": 0, "cma_requests": 0, "persistent_state_writes": 0},
     }
+    if EXPECTED_RESULT_SHA256 and result_hash != EXPECTED_RESULT_SHA256:
+        raise ReplayError("Replay results differ from the reviewed baseline", diagnostic)
+    diagnostic["baseline_verified"] = bool(EXPECTED_REPORT_SHA256 and EXPECTED_RESULT_SHA256)
+    return diagnostic
 
 
 def main():
@@ -161,6 +182,10 @@ def main():
         print("[CMA_REPLAY] " + json.dumps(result, sort_keys=True, allow_nan=False))
         return 0
     except Exception as exc:
+        if isinstance(exc, ReplayError) and exc.diagnostic is not None:
+            print("[CMA_REPLAY_DIAGNOSTIC] " + json.dumps(
+                exc.diagnostic, sort_keys=True, allow_nan=False,
+            ), flush=True)
         detail = str(exc) if isinstance(exc, ReplayError) else type(exc).__name__
         print(f"[CMA_REPLAY_ERROR] {detail}", file=sys.stderr)
         return 1

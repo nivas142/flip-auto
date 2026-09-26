@@ -27,7 +27,7 @@ META_REFRESH_RE = re.compile(
 )
 DEFAULT_MAX_REPORT_BYTES = 200 * 1024 * 1024
 MAX_WRAPPER_BYTES = 2 * 1024 * 1024
-CLOUD_CMA_PARSER_VERSION = 2
+CLOUD_CMA_PARSER_VERSION = 3
 
 
 class CloudCmaReportTooLarge(ValueError):
@@ -194,7 +194,10 @@ def _parse_report_date(value: str) -> date | None:
 def _labeled_value(labels: tuple[str, ...], text: str, value_pattern: str) -> str:
     label_pattern = "|".join(re.escape(label) for label in labels)
     return _field(
-        rf"(?<!\w)(?:{label_pattern})(?!\w)\s*(?:[#:=-]\s*)*({value_pattern})",
+        # PDF extractors may omit the gap in e.g. "Year Built1997".
+        # A numeric continuation is valid, but a longer word such as
+        # "Year BuiltEstimate" must not be treated as this field's label.
+        rf"(?<!\w)(?:{label_pattern})(?=\W|[0-9]|$)\s*(?:[#:=-]\s*)*({value_pattern})",
         text,
         flags=re.IGNORECASE,
     )
@@ -212,6 +215,20 @@ def _listing_address(page: str, mls_number: str) -> str:
         page,
         flags=re.IGNORECASE | re.DOTALL,
     )
+    if not match:
+        # Some extractor versions join the street suffix and city in the
+        # report header ("LaneGilbert"). Only split a whole, spelled-out
+        # suffix followed by a capitalized city and a state/ZIP; do not
+        # guess at joins inside street words or abbreviations like "Drake".
+        match = re.search(
+            r"(?P<address>\d{1,6}\s+[^\n]{2,100}?\b(?:"
+            r"Street|Road|Drive|Lane|Avenue|Court|Way|Place|"
+            r"Boulevard|Trail|Circle|Parkway"
+            r"))(?P<city>(?-i:[A-Z])[A-Za-z .'-]{1,40})\s*,\s*"
+            r"(?P<state>[A-Z]{2})\s+(?P<zip>\d{5})",
+            page,
+            flags=re.IGNORECASE,
+        )
     if not match:
         return f"MLS #{mls_number}"
     return (
@@ -246,6 +263,11 @@ def _subject_from_pages(pages: list[str], requested_address: str) -> dict[str, A
 
 
 def _parse_closed_detail_page(page: str, *, as_of: date) -> dict[str, Any] | None:
+    explicit_status = _field(r"\bStatus\s*:\s*([A-Za-z]+)", page)
+    if explicit_status and explicit_status.lower() not in {"closed", "sold", "s"}:
+        # An active listing can display historical sold fields. They cannot
+        # override an explicit current status when selecting closed comps.
+        return None
     if not re.search(r"\b(?:CLOSED|SOLD)\b", page, re.IGNORECASE):
         return None
 
