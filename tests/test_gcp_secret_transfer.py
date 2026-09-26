@@ -218,6 +218,89 @@ class SecretTransferTests(unittest.TestCase):
         self.assertNoPayloads(stderr.getvalue())
 
 
+
+class ZohoSecretTransferTests(unittest.TestCase):
+    sources = {
+        "ZOHO_EMAIL_USERNAME": "zoho-fixture@example.invalid",
+        "ZOHO_EMAIL_APP_PASSWORD": " zoho-password-é\n",
+    }
+    destinations = ("flip-auto-zoho-email-username", "flip-auto-zoho-email-app-password")
+
+    def test_only_zoho_bytes_are_uploaded_to_fixed_destinations(self):
+        environ = {**SOURCES, **self.sources, "PATH": "/usr/bin"}
+        output = io.StringIO()
+        observed = []
+
+        def fake_run(command, **kwargs):
+            observed.append(command[4])
+            source = next(name for name, dest in transfer.SECRET_PROFILES["zoho"] if dest == command[4])
+            self.assertEqual(kwargs["input"], self.sources[source].encode())
+            self.assertFalse((SOURCES.keys() | self.sources.keys()) & kwargs["env"].keys())
+            return completed(command[4])
+
+        with patch.object(transfer.subprocess, "run", side_effect=fake_run):
+            versions = transfer.transfer_secrets(environ, output, profile="zoho")
+        self.assertEqual(tuple(observed), self.destinations)
+        self.assertEqual(len(versions), 2)
+        self.assertFalse(self.sources.keys() & environ.keys())
+        for value in (*SOURCES.values(), *self.sources.values()):
+            self.assertNotIn(value, output.getvalue())
+
+    def test_missing_either_zoho_secret_blocks_all_uploads(self):
+        for source in self.sources:
+            environ = dict(self.sources)
+            environ[source] = " "
+            with patch.object(transfer.subprocess, "run") as run:
+                with self.assertRaisesRegex(transfer.TransferError, "Missing required"):
+                    transfer.transfer_secrets(environ, io.StringIO(), profile="zoho")
+            run.assert_not_called()
+            self.assertFalse(self.sources.keys() & environ.keys())
+
+    def test_unknown_profile_has_no_uploads(self):
+        with patch.object(transfer.subprocess, "run") as run:
+            with self.assertRaisesRegex(transfer.TransferError, "Unknown transfer profile"):
+                transfer.transfer_secrets(dict(self.sources), io.StringIO(), profile="elsewhere")
+        run.assert_not_called()
+
+    def test_zoho_preflight_defaults_and_effective_inherited_window(self):
+        for env in ({}, {"ZOHO_IMAP_HOST": "imap.zoho.com", "ZOHO_FOLDER": "Off-Market-Deals"},
+                    {"EMAIL_LOOKBACK_HOURS": "48"}, {"ZOHO_LOOKBACK_HOURS": "48", "EMAIL_LOOKBACK_HOURS": "72"}):
+            output = io.StringIO()
+            with patch.object(transfer.subprocess, "run") as run:
+                transfer.check_zoho_config(dict(env), output)
+            run.assert_not_called()
+            self.assertEqual(output.getvalue(), "ZOHO_HOST_MATCH=true\nZOHO_FOLDER_MATCH=true\nZOHO_LOOKBACK_MATCH=true\n")
+
+    def test_zoho_preflight_mismatches_reveal_no_values_and_do_no_uploads(self):
+        for setting, value, flag in (
+            ("ZOHO_IMAP_HOST", "secret-host.invalid", "ZOHO_HOST_MATCH"),
+            ("ZOHO_FOLDER", "private-folder", "ZOHO_FOLDER_MATCH"),
+            ("ZOHO_LOOKBACK_HOURS", "72", "ZOHO_LOOKBACK_MATCH"),
+            ("EMAIL_LOOKBACK_HOURS", "72", "ZOHO_LOOKBACK_MATCH"),
+            ("ZOHO_LOOKBACK_HOURS", "private-invalid", "ZOHO_LOOKBACK_MATCH"),
+        ):
+            output = io.StringIO()
+            environ = {setting: value}
+            with patch.object(transfer.subprocess, "run") as run:
+                with self.assertRaisesRegex(transfer.TransferError, "nothing was uploaded") as caught:
+                    transfer.check_zoho_config(environ, output)
+            run.assert_not_called()
+            self.assertNotIn(setting, environ)
+            self.assertIn(flag + "=false", output.getvalue())
+            self.assertNotIn(value, output.getvalue() + str(caught.exception))
+
+    def test_cli_zoho_profile_and_preflight_dispatch_are_fixed(self):
+        for args, expected_profile in ((["--profile", "zoho"], "zoho"), (["--profile", "core"], "core")):
+            with patch.object(sys, "argv", ["transfer-secrets.py", *args]):
+                with patch.object(transfer, "transfer_secrets") as run:
+                    self.assertEqual(transfer.main(), 0)
+                    self.assertEqual(run.call_args.kwargs, {"profile": expected_profile})
+        with patch.object(sys, "argv", ["transfer-secrets.py", "--check-zoho-config"]):
+            with patch.object(transfer, "check_zoho_config") as check, patch.object(transfer, "transfer_secrets") as run:
+                self.assertEqual(transfer.main(), 0)
+                check.assert_called_once()
+                run.assert_not_called()
+
 class TransferWorkflowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -230,7 +313,9 @@ class TransferWorkflowTests(unittest.TestCase):
     def test_dispatch_main_identity_and_confirmation_gate(self):
         self.assertEqual(set(self.workflow["on"]), {"workflow_dispatch"})
         inputs = self.workflow["on"]["workflow_dispatch"]["inputs"]
-        self.assertEqual(set(inputs), {"confirmation"})
+        self.assertEqual(set(inputs), {"confirmation", "profile"})
+        self.assertEqual(inputs["profile"]["default"], "core")
+        self.assertEqual(inputs["profile"]["options"], ["core", "zoho"])
         self.assertEqual(inputs["confirmation"]["required"], "true")
         for guard in (
             "github.event_name == 'workflow_dispatch'", "github.ref == 'refs/heads/main'",
@@ -261,6 +346,34 @@ class TransferWorkflowTests(unittest.TestCase):
         self.assertEqual(source_steps[0]["run"], "python3 -I deploy/gcp/transfer-secrets.py")
         self.assertEqual(source_steps[0]["env"], {name: "${{ secrets." + name + " }}" for name in SOURCES})
         self.assertNotIn("secrets.", str(self.job["env"]))
+        self.assertIn("RUNNER_DEBUG", steps[0]["run"])
+
+
+    def test_zoho_job_checks_options_before_auth_and_injects_only_selected_secrets(self):
+        job = self.workflow["jobs"]["transfer_zoho"]
+        for guard in (
+            "github.event_name == 'workflow_dispatch'", "github.ref == 'refs/heads/main'",
+            "github.repository_id == '1172251948'", "github.repository_owner_id == '22221409'",
+            "inputs.profile == 'zoho'", "inputs.confirmation == 'COPY-TWO-ZOHO-SECRETS'",
+        ):
+            self.assertIn(guard, job["if"])
+        self.assertEqual(job["environment"], "main")
+        steps = job["steps"]
+        preflight = next(step for step in steps if step.get("run", "").endswith("--check-zoho-config"))
+        auth = next(step for step in steps if step.get("uses", "").startswith("google-github-actions/auth@"))
+        copy_step = next(step for step in steps if step.get("run", "").endswith("--profile zoho"))
+        self.assertLess(steps.index(preflight), steps.index(auth))
+        self.assertLess(steps.index(auth), steps.index(copy_step))
+        self.assertEqual(set(preflight["env"]), {"ZOHO_IMAP_HOST", "ZOHO_FOLDER", "ZOHO_LOOKBACK_HOURS", "EMAIL_LOOKBACK_HOURS"})
+        self.assertEqual(copy_step["env"], {name: "${{ secrets." + name + " }}" for name in ZohoSecretTransferTests.sources})
+        self.assertEqual(auth["with"]["workload_identity_provider"], "projects/941818435041/locations/global/workloadIdentityPools/flip-auto-zoho-secret-transfer/providers/github")
+        self.assertEqual(auth["with"]["cleanup_credentials"], "true")
+        self.assertNotIn("service_account", auth["with"])
+        for step in steps:
+            if "uses" in step:
+                self.assertRegex(step["uses"], r"@[0-9a-f]{40}$")
+        for name in SOURCES:
+            self.assertNotIn("secrets." + name, str(job))
         self.assertIn("RUNNER_DEBUG", steps[0]["run"])
 
 
