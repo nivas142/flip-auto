@@ -1,0 +1,25 @@
+name: Unit tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-gcp.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q monitor.py cloud_cma.py cloud_cma_callback.py deal_screening.py valuation.py gcp_runtime.py
