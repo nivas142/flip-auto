@@ -66,9 +66,11 @@ The September 26 failed replay reached the result-hash comparison. Locally,
 changing only pypdf from 6.10.0 to 6.19.0 reproduced a failure: the extracted
 text joined street suffixes to cities and numeric values to labels, losing
 comp addresses and years. This changed similarity weights and the upper ARV.
-It was not a harmless JSON ordering difference. The failed cloud execution
-did not report its dependency version, so that specific runtime cause still
-requires confirmation.
+It was not a harmless JSON ordering difference. The subsequent Cloud Shell
+check of the configured image confirmed pypdf 6.19.0 and Python 3.12.14. With
+the fixed parser mounted, it reproduced the original result hash exactly,
+including all four addresses/build years and both screening decisions. The
+original failed Cloud Run execution itself has not been rerun successfully.
 
 Parser version 3 handles these compact fields without accepting longer-word
 label prefixes, list prices, or claimed ARV. It also rejects an explicitly
@@ -102,6 +104,36 @@ On a result mismatch, the runner emits `[CMA_REPLAY_DIAGNOSTIC]` with explicit
 selected comp facts, expected/actual hashes, and parser/dependency versions,
 then exits nonzero. This record is never a success marker. It does not print
 raw PDF text, email content, credentials, or environment variables.
+
+## Put the verified parser into the shadow image
+
+After the compatibility check succeeds, run from a reviewed checkout:
+
+```bash
+python3 deploy/gcp/update-shadow-parser.py --check
+python3 deploy/gcp/update-shadow-parser.py --apply
+```
+
+This one-off helper verifies the exact parser and replay source hashes. It
+builds a derivative of the original immutable image, copying only the fixed
+`cloud_cma.py`; the tested dependencies and runtime remain the same. It runs
+the retained-report replay against that candidate image with only the replay
+script mounted, so the parser must be present in the image itself. A failed
+replay stops the rollout before any Cloud Run update.
+
+The helper verifies the fixed project and existing shadow job configuration,
+pushes the validated image to the existing `monitor` repository, resolves an
+immutable digest, checks for configuration drift, and updates only the image
+on `flip-auto-shadow`. Readback must confirm the new image and preserved task
+configuration. The old image digest is printed for rollback. It stops if the
+job no longer uses the original image; rerunning is not a generic redeployment
+or automatic rollback operation.
+
+No schedule, IAM policy, secret version/binding, production workflow, replay
+job, or shadow state is changed by this helper. It does not trigger a mailbox
+execution. Check the next scheduled shadow execution for completion and scan
+errors; deployment readback alone is not runtime validation. Continue Zoho
+and request/callback validation separately before production cutover.
 
 ## Isolation
 
