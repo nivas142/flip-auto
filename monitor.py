@@ -559,6 +559,7 @@ def request_cloud_cma_for_deal(
     request_budget: list[int],
 ) -> ValuationResult:
     """Request at most one report per address within the configured TTL."""
+    shadow = valuation_cfg.get("execution_mode") == "shadow"
     request_key = cma_address_hash(deal.address)
     requests = state.setdefault("cma_requests", {})
     unavailable_reports = state.setdefault("cma_reports_unavailable", {})
@@ -586,11 +587,12 @@ def request_cloud_cma_for_deal(
         try:
             pdf_bytes = download_cloud_cma_pdf(pdf_url, max_bytes=max_bytes)
         except CloudCmaReportTooLarge:
-            delete_result(
-                str(valuation_cfg.get("callback_base_url") or ""),
-                request_key,
-                str(valuation_cfg.get("callback_secret") or ""),
-            )
+            if not shadow:
+                delete_result(
+                    str(valuation_cfg.get("callback_base_url") or ""),
+                    request_key,
+                    str(valuation_cfg.get("callback_secret") or ""),
+                )
             state.setdefault("cma_reports_rejected", {})[request_key] = datetime.now(UTC).isoformat()
             return unavailable_valuation(
                 f"Cloud CMA report exceeded the {max_report_mb} MB safe download limit"
@@ -619,11 +621,12 @@ def request_cloud_cma_for_deal(
         valuation = calculate_comp_valuation(payload, valuation_cfg)
         diagnostics = dict(payload.get("parseDiagnostics") or {})
         if valuation.status == "complete":
-            delete_result(
-                str(valuation_cfg.get("callback_base_url") or ""),
-                request_key,
-                str(valuation_cfg.get("callback_secret") or ""),
-            )
+            if not shadow:
+                delete_result(
+                    str(valuation_cfg.get("callback_base_url") or ""),
+                    request_key,
+                    str(valuation_cfg.get("callback_secret") or ""),
+                )
             state.setdefault("cma_reports_processed", {})[request_key] = datetime.now(UTC).isoformat()
             unavailable_reports.pop(request_key, None)
         else:
@@ -648,6 +651,8 @@ def request_cloud_cma_for_deal(
                 file=sys.stderr,
             )
         return valuation
+    if shadow:
+        return pending_valuation("Shadow mode: new CMA requests disabled")
     if request_budget[0] <= 0:
         return pending_valuation("Cloud CMA request queue is rate limited")
 
@@ -1026,7 +1031,12 @@ def scan_email_account(
     seen: set[str] | None = None,
     state: dict[str, Any] | None = None,
     request_budget: list[int] | None = None,
+    *,
+    execution_mode: str = "live",
 ) -> list[AlertItem]:
+    if execution_mode not in {"live", "shadow"}:
+        raise ValueError("Invalid execution_mode")
+    shadow = execution_mode == "shadow"
     host = account_cfg["imap_host"]
     username = account_cfg["username"]
     password = account_cfg["password"]
@@ -1038,7 +1048,9 @@ def scan_email_account(
     cities = account_cfg.get("cities", [])
     label = account_cfg.get("label") or username or host
     screening_cfg = screening_cfg or {}
-    valuation_cfg = valuation_cfg or {}
+    valuation_cfg = dict(valuation_cfg or {})
+    if shadow:
+        valuation_cfg["execution_mode"] = "shadow"
     seen = seen or set()
     state = state if state is not None else {"cma_requests": {}}
     request_budget = request_budget if request_budget is not None else [0]
@@ -1054,22 +1066,28 @@ def scan_email_account(
     try:
         mail = imaplib.IMAP4_SSL(host)
         mail.login(username, password)
-        status, _ = mail.select(folder)
+        status, _ = mail.select(folder, readonly=True) if shadow else mail.select(folder)
         if status != "OK":
             raise RuntimeError(f"Could not select folder '{folder}' for {label}")
 
         since_date = cutoff_dt.strftime("%d-%b-%Y")
         status, msg_ids = mail.search(None, f'(SINCE "{since_date}")')
         if status != "OK":
+            if shadow:
+                raise RuntimeError("Shadow IMAP search failed")
             return []
 
         for msg_id in msg_ids[0].split():
             scanned += 1
             status, header_data = mail.fetch(msg_id, "(BODY.PEEK[HEADER])")
             if status != "OK" or not header_data:
+                if shadow:
+                    raise RuntimeError("Shadow IMAP header fetch failed")
                 continue
             header_raw = extract_fetch_bytes(header_data)
             if not header_raw:
+                if shadow:
+                    raise RuntimeError("Shadow IMAP header payload missing")
                 continue
             header_msg = message_from_bytes(header_raw)
             msg_dt = parse_email_datetime(header_msg)
@@ -1088,14 +1106,19 @@ def scan_email_account(
 
             status, data = mail.fetch(msg_id, "(BODY.PEEK[])")
             if status != "OK" or not data:
+                if shadow:
+                    raise RuntimeError("Shadow IMAP message fetch failed")
                 continue
             raw = extract_fetch_bytes(data)
             if not raw:
+                if shadow:
+                    raise RuntimeError("Shadow IMAP message payload missing")
                 continue
             msg = message_from_bytes(raw)
 
             # Explicitly mark only configured-sender messages as read.
-            mail.store(msg_id, "+FLAGS", "\\Seen")
+            if not shadow:
+                mail.store(msg_id, "+FLAGS", "\\Seen")
 
             received_at = parse_email_timestamp(msg)
             body = parse_email_body(msg)
@@ -1115,6 +1138,9 @@ def scan_email_account(
                     item_id = deal_item_id(deal)
                     if item_id in seen:
                         continue
+                    if shadow:
+                        metrics = state.setdefault("last_run", {})
+                        metrics["eligible_deals"] = metrics.get("eligible_deals", 0) + 1
                     try:
                         valuation = request_cloud_cma_for_deal(
                             deal,
@@ -1123,6 +1149,12 @@ def scan_email_account(
                             request_budget,
                         )
                     except Exception as exc:
+                        if shadow:
+                            # Propagate safe diagnostics so Cloud Run cannot
+                            # report success when valuation infrastructure failed.
+                            raise RuntimeError(
+                                f"Shadow CMA lookup failed ({type(exc).__name__})"
+                            ) from None
                         print(
                             "[WARN] Cloud CMA request failed "
                             f"(request={cma_address_hash(deal.address)[:12]}, "
@@ -1135,7 +1167,12 @@ def scan_email_account(
                     # deal remains unseen and will be combined with the report
                     # on the next scheduled run.
                     if valuation.status != "complete":
+                        if shadow:
+                            metric = f"valuations_{valuation.status}"
+                            metrics[metric] = metrics.get(metric, 0) + 1
                         continue
+                    if shadow:
+                        metrics["valuations_complete"] = metrics.get("valuations_complete", 0) + 1
                     results.append(
                         build_deal_alert(
                             deal=deal,
@@ -1191,6 +1228,10 @@ def scan_email_account(
             )
         return results
     finally:
+        if shadow:
+            metrics = state.setdefault("last_run", {})
+            metrics["scanned_messages"] = metrics.get("scanned_messages", 0) + scanned
+            metrics["matched_messages"] = metrics.get("matched_messages", 0) + matched
         if mail is not None:
             try:
                 mail.close()
@@ -1200,8 +1241,9 @@ def scan_email_account(
                 mail.logout()
             except Exception:
                 pass
+        log_label = "shadow-mailbox" if shadow else label
         print(
-            f"[INFO] Email account {label} ({host}): scanned {scanned} messages, "
+            f"[INFO] Email account {log_label} ({host}): scanned {scanned} messages, "
             f"matched {matched}.",
             file=sys.stderr,
         )
@@ -1236,6 +1278,7 @@ def scan_emails(
                 seen,
                 state,
                 request_budget,
+                execution_mode=config.get("execution_mode", "live"),
             )
         )
     return results
@@ -1245,6 +1288,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     sheet_cfg = config.get("gsheet", {})
     if not sheet_cfg.get("enabled", False):
         return []
+    shadow = config.get("execution_mode") == "shadow"
     screening_enabled = bool(config.get("screening", {}).get("enabled", False))
     content_columns = sheet_cfg.get("content_columns", [])
     city_column = sheet_cfg.get("city_column", "city")
@@ -1256,6 +1300,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     try:
         public_data = load_public_sheet_rows(sheet_cfg)
     except Exception as exc:
+        if shadow:
+            raise RuntimeError(f"Shadow sheet fetch failed ({type(exc).__name__})") from None
         print(
             f"[WARN] Google Sheet public fetch failed ({exc.__class__.__name__}: {exc}). "
             "Will try service-account access if configured.",
@@ -1270,6 +1316,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
         worksheet_name = sheet_cfg.get("worksheet", "Sheet1")
 
         if not credentials_file or not spreadsheet_id:
+            if shadow:
+                raise RuntimeError("Shadow sheet access is not configured")
             print(
                 "[WARN] Google Sheet not accessible: no public URL and missing "
                 "service-account settings. Continuing without sheet matches.",
@@ -1301,6 +1349,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
                 rows = ws.get_all_records()
             source_key = f"{spreadsheet_id}:{worksheet_name}"
         except Exception as exc:
+            if shadow:
+                raise RuntimeError(f"Shadow sheet access failed ({type(exc).__name__})") from None
             hint = ""
             if exc.__class__.__name__ == "SpreadsheetNotFound":
                 hint = (
@@ -1415,50 +1465,59 @@ def send_alert(config: dict[str, Any], item: AlertItem) -> bool:
     return False
 
 
-def main() -> int:
-    config_path = Path("config.yaml")
-    if not config_path.exists():
-        print("Missing config.yaml. Copy config.example.yaml to config.yaml and edit values.")
-        return 1
-
-    config = load_yaml(config_path)
-
-    state_path = Path(config.get("state_file", "state/monitor_state.json"))
-    state = load_state(state_path)
+def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
+    """Run with caller-owned state; shadow mode has no production side effects."""
+    mode = config.get("execution_mode", "live")
+    if mode not in {"live", "shadow"}:
+        raise ValueError("Invalid execution_mode")
+    shadow = mode == "shadow"
+    state["last_run"] = {"mode": mode, "started_at": datetime.now(UTC).isoformat()}
     seen_order = list(dict.fromkeys(state.get("seen", [])))
     seen = set(seen_order)
 
     telegram_cfg = config.get("telegram", {})
     twilio_cfg = config.get("twilio", {})
-    if not telegram_cfg.get("enabled", False) and not twilio_cfg.get("enabled", False):
+    if shadow:
+        print("[SHADOW] No notifications, email flag writes, new CMAs, or callback deletion.")
+    elif not telegram_cfg.get("enabled", False) and not twilio_cfg.get("enabled", False):
         print("No notifier enabled; running in dry-run mode.")
 
     matches: list[AlertItem] = []
+    errors = 0
     try:
         matches.extend(scan_emails(config, seen, state))
     except Exception as exc:
+        errors += 1
+        error_detail = exc.__class__.__name__ if shadow else f"{exc.__class__.__name__}: {exc}"
         print(
-            f"[WARN] Email scan failed ({exc.__class__.__name__}: {exc}). Continuing.",
+            f"[WARN] Email scan failed ({error_detail}). Continuing.",
             file=sys.stderr,
         )
     try:
         matches.extend(scan_sheet(config))
     except Exception as exc:
+        errors += 1
+        error_detail = exc.__class__.__name__ if shadow else f"{exc.__class__.__name__}: {exc}"
         print(
-            f"[WARN] Sheet scan failed ({exc.__class__.__name__}: {exc}). Continuing.",
+            f"[WARN] Sheet scan failed ({error_detail}). Continuing.",
             file=sys.stderr,
         )
 
     sent = 0
     suppressed = 0
+    would_alert = 0
     for item in matches:
         if item.item_id in seen:
             continue
 
         if item.notify:
-            if not send_alert(config, item):
+            if shadow:
+                would_alert += 1
+                print(f"[SHADOW] Would alert: {item.title}")
+            elif not send_alert(config, item):
                 print(f"[DRY RUN] {item.title}\n{item.body}\n")
-            sent += 1
+            if not shadow:
+                sent += 1
         else:
             print(f"[SUPPRESSED] {item.title}")
             suppressed += 1
@@ -1469,13 +1528,34 @@ def main() -> int:
     # Keep state bounded.
     max_seen = max(100, int(config.get("state_max_seen", 2000)))
     state["seen"] = seen_order[-max_seen:]
-    save_state(state_path, state)
+    state["last_run"].update(
+        finished_at=datetime.now(UTC).isoformat(), matches=len(matches),
+        sent=sent, suppressed=suppressed, would_alert=would_alert, errors=errors,
+    )
 
     print(
         f"Processed {len(matches)} matches, sent {sent} new alerts, "
         f"suppressed {suppressed}."
     )
-    return 0
+    if shadow:
+        print(f"[SHADOW] Would alert {would_alert}; scan errors {errors}.")
+    return 1 if shadow and errors else 0
+
+
+def main() -> int:
+    config_path = Path("config.yaml")
+    if not config_path.exists():
+        print("Missing config.yaml. Copy config.example.yaml to config.yaml and edit values.")
+        return 1
+    config = load_yaml(config_path)
+    if config.get("execution_mode") == "shadow":
+        print("Use gcp_runtime.py for shadow execution with isolated state.", file=sys.stderr)
+        return 1
+    state_path = Path(config.get("state_file", "state/monitor_state.json"))
+    state = load_state(state_path)
+    result = run_monitor(config, state)
+    save_state(state_path, state)
+    return result
 
 
 if __name__ == "__main__":

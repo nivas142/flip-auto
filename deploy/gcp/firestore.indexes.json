@@ -1,0 +1,10 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "flip_auto_shadow_state",
+      "fieldPath": "state_json",
+      "indexes": []
+    }
+  ]
+}

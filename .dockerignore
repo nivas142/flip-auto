@@ -1,0 +1,12 @@
+**
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!requirements-gcp.txt
+!monitor.py
+!cloud_cma.py
+!cloud_cma_callback.py
+!deal_screening.py
+!valuation.py
+!gcp_runtime.py
+!config.example.yaml
