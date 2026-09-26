@@ -143,6 +143,39 @@ class CloudCmaTests(unittest.TestCase):
         self.assertEqual(comp["soldPrice"], 425_000)
         self.assertEqual(comp["mlsNumber"], "7051111")
         self.assertFalse(comp["hasPool"])
+        self.assertEqual(payload["parseDiagnostics"]["parsedClosedComparables"], 1)
+
+    def test_parses_split_layout_with_independent_closed_fields(self):
+        split_detail_page = """754 S SORRELL Lane
+GILBERT, AZ 85296
+MLS #: 7051111
+Status: CLOSED
+Sold Price: $425,000
+Bedrooms: 4
+Bathrooms: 3.0
+Living Area: 1,610
+Close of Escrow: 08/07/2026
+DOM: 3
+Year Built: 1997
+Property Details
+Prop Type: Single Family Residence
+Subdivision: FINLEY FARMS SOUTH PARCEL 18
+List Price: $9,999,999
+Pool Features: None
+"""
+        payload = parse_cloud_cma_pages(
+            [MAP_PAGE, split_detail_page],
+            requested_address="2010 E Arabian Dr, Gilbert, AZ 85296",
+            as_of=date(2026, 9, 16),
+        )
+
+        self.assertEqual(len(payload["comparables"]), 1)
+        comp = payload["comparables"][0]
+        self.assertEqual(comp["soldPrice"], 425_000)
+        self.assertEqual(comp["squareFootage"], 1_610)
+        self.assertEqual(comp["soldDate"], "2026-08-07")
+        self.assertEqual(comp["formattedAddress"], "754 S SORRELL Lane, GILBERT, AZ 85296")
+        self.assertNotEqual(comp["soldPrice"], comp["listPrice"])
 
     def test_cloud_cma_average_or_list_price_cannot_feed_arv(self):
         pages = [MAP_PAGE]
