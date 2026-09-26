@@ -166,6 +166,16 @@ class ParserRolloutTests(unittest.TestCase):
         self.assertIn("[CMA_REPLAY_ERROR]", output.getvalue())
         self.assertNotIn("unrelated", output.getvalue())
 
+    def test_empty_mutation_response_is_followed_by_configuration_readback(self):
+        result = subprocess.CompletedProcess([], 0, stdout="", stderr="Updated job.")
+        with patch.object(rollout.subprocess, "run", return_value=result):
+            self.assertEqual(rollout.Commands().gcloud("run", "jobs", "update", rollout.JOB), {})
+        commands = FakeCommands()
+        rollout.apply(ROOT, commands, io.StringIO())
+        update_index = next(i for i, call in enumerate(commands.calls)
+                            if call[:4] == ("gcloud", "run", "jobs", "update"))
+        self.assertEqual(commands.calls[update_index + 1][:4], ("gcloud", "run", "jobs", "describe"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -52,7 +52,9 @@ class Commands:
         output = self.run("gcloud", *args, f"--project={PROJECT}", "--quiet", "--format=json",
                           "--verbosity=error", "--no-log-http", timeout=300)
         try:
-            return json.loads(output)
+            # Some successful mutations print only progress to stderr. The
+            # subsequent describe, not this response, verifies the update.
+            return json.loads(output) if output.strip() else {}
         except json.JSONDecodeError as exc:
             raise RolloutError("Unexpected Google response") from exc
 
