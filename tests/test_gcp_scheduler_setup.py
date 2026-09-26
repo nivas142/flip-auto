@@ -56,7 +56,7 @@ def owned_job():
     return {
         "name": "projects/flip-auto/locations/us-central1/jobs/flip-auto-shadow",
         "description": MARKER,
-        "schedule": "*/30 * * * *",
+        "schedule": "every 30 minutes from 07:00 to 18:00",
         "timeZone": "America/Phoenix",
         "state": "ENABLED", "attemptDeadline": "180s",
         "httpTarget": {
@@ -101,6 +101,11 @@ class SchedulerSetupTests(unittest.TestCase):
         result, state = self.invoke({"propagation_failures": 2})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(state["create_attempts"], 3)
+        create_calls = [call for call in state["calls"]
+                        if call[:3] == ["scheduler", "jobs", "create"]]
+        for call in create_calls:
+            self.assertIn("--schedule=every 30 minutes from 07:00 to 18:00", call)
+            self.assertIn("--time-zone=America/Phoenix", call)
         prefixes = [call[:3] for call in state["calls"]]
         self.assertLess(prefixes.index(["scheduler", "jobs", "pause"]),
                         prefixes.index(["scheduler", "jobs", "describe"]))

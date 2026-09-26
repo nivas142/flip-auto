@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Creates a PAUSED shadow schedule; this script never activates scheduling.
+# Runs every 30 minutes from 07:00 through 18:00 America/Phoenix once resumed.
 # After a partial failure, rerun with --apply --recover-existing-sa. Recovery
 # requires this script's exact account metadata and no existing invocation IAM.
 set -euo pipefail
@@ -63,7 +64,7 @@ if jobs:
     retry = job.get('retryConfig', {})
     headers = {key.lower(): value for key, value in target.get('headers', {}).items()}
     require(job.get('name') == name and job.get('description') == marker
-            and job.get('schedule') == '*/30 * * * *' and job.get('timeZone') == 'America/Phoenix'
+            and job.get('schedule') == 'every 30 minutes from 07:00 to 18:00' and job.get('timeZone') == 'America/Phoenix'
             and job.get('state') in ('PAUSED', 'ENABLED') and job.get('attemptDeadline') == '180s'
             and retry.get('retryCount', 0) == 0 and retry.get('maxRetryDuration', '0s') == '0s'
             and headers.get('content-type') == 'application/json'
@@ -78,7 +79,7 @@ if [[ "$scheduler_state" == ABSENT ]]; then
   for attempt in {1..7}; do
     if gcloud scheduler jobs create http flip-auto-shadow \
       --project="$FLIP_AUTO_GCP_PROJECT_ID" --location="$FLIP_AUTO_GCP_REGION" \
-      --description="$marker" --schedule='*/30 * * * *' --time-zone=America/Phoenix \
+      --description="$marker" --schedule='every 30 minutes from 07:00 to 18:00' --time-zone=America/Phoenix \
       --uri="https://run.googleapis.com/v2/projects/${FLIP_AUTO_GCP_PROJECT_ID}/locations/${FLIP_AUTO_GCP_REGION}/jobs/flip-auto-shadow:run" \
       --http-method=POST --headers=Content-Type=application/json --message-body='{}' \
       --oauth-service-account-email="$scheduler_sa" \
