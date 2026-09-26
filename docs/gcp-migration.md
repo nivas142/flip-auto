@@ -211,6 +211,14 @@ document is a prerequisite for useful callback replay; never overwrite existing
 shadow state silently or copy shadow state back to production. State seeding is
 not automated by these deployment scripts.
 
+For a populated shadow document, use the separate
+[retained CMA replay](gcp-cma-replay.md) to validate the deployed parser,
+valuation, and screening without replacing state. The replay compares an exact
+PDF and fixed inputs against a local production-source baseline; it does not
+exercise new CMA submissions, callback delivery, or notifications. The
+[Zoho transfer profile](gcp-secret-transfer.md#add-zoho-after-the-completed-core-transfer)
+adds the second mailbox through separate, temporary two-secret access.
+
 After the manual cloud execution passes, an operator can create the paused
 scheduler with `bash deploy/gcp/create-paused-scheduler.sh --apply`. There is no
 atomic create-as-PAUSED API: the script creates a fresh, unprivileged invoker,

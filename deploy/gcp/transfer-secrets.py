@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Add exactly three existing GitHub secret values to fixed shadow secrets.
+"""Add one fixed set of existing GitHub secret values to shadow secrets.
 
-The dedicated direct WIF identity needs only secretVersionAdder on these three
+The dedicated direct WIF identity needs only secretVersionAdder on the selected
 resources. It cannot list or access versions to deduplicate. Every rerun adds new
 versions; a failed request may already have committed. Never retry automatically.
 No GitHub/Cloudflare secrets or runtime deployments are changed by this helper.
@@ -26,6 +26,14 @@ SECRET_MAPPING = (
     ("CLOUD_CMA_WEBHOOK_SECRET", "flip-auto-cma-webhook-secret"),
 )
 
+SECRET_PROFILES = {
+    "core": SECRET_MAPPING,
+    "zoho": (
+        ("ZOHO_EMAIL_USERNAME", "flip-auto-zoho-email-username"),
+        ("ZOHO_EMAIL_APP_PASSWORD", "flip-auto-zoho-email-app-password"),
+    ),
+}
+
 # Do not inherit arbitrary CLOUDSDK settings (endpoint overrides, tracing,
 # impersonation, alternate projects) or shell/Python debugging hooks. gcloud
 # authenticates directly from the ephemeral file created/cleaned by auth@v3.
@@ -44,10 +52,10 @@ class TransferError(Exception):
     """Contains only messages built from fixed identifiers, never subprocess data."""
 
 
-def _take_payloads(environ: MutableMapping[str, str]) -> dict[str, bytes]:
+def _take_payloads(environ: MutableMapping[str, str], mapping=SECRET_MAPPING) -> dict[str, bytes]:
     # Remove every source from the process environment, including on validation
     # failure, and validate the complete set before any external command runs.
-    values = {name: environ.pop(name, "") for name, _ in SECRET_MAPPING}
+    values = {name: environ.pop(name, "") for name, _ in mapping}
     missing = [name for name, value in values.items() if not value.strip()]
     if missing:
         raise TransferError("Missing required GitHub secrets: " + ", ".join(missing))
@@ -88,14 +96,17 @@ def _verified_version(raw: bytes, secret_id: str) -> str:
     return resource
 
 
-def transfer_secrets(environ: MutableMapping[str, str], output: TextIO) -> tuple[str, ...]:
-    payloads = _take_payloads(environ)
+def transfer_secrets(environ: MutableMapping[str, str], output: TextIO, profile="core") -> tuple[str, ...]:
+    if profile not in SECRET_PROFILES:
+        raise TransferError("Unknown transfer profile; nothing was uploaded.")
+    mapping = SECRET_PROFILES[profile]
+    payloads = _take_payloads(environ, mapping)
     versions = []
     # Isolate and remove any CLI state/credential cache as soon as the transfer
     # ends. Payloads only pass through pipes; no payload is ever written to disk.
     with tempfile.TemporaryDirectory(prefix="flip-auto-secret-transfer-") as config_dir:
         child_env = _gcloud_environment(environ, config_dir)
-        for source_name, secret_id in SECRET_MAPPING:
+        for source_name, secret_id in mapping:
             command = [
                 "gcloud", "secrets", "versions", "add", secret_id,
                 f"--project={PROJECT_ID}", "--data-file=-", "--format=value(name)",
@@ -129,12 +140,44 @@ def transfer_secrets(environ: MutableMapping[str, str], output: TextIO) -> tuple
     return tuple(versions)
 
 
+def check_zoho_config(environ: MutableMapping[str, str], output: TextIO) -> None:
+    """Check effective production options without printing their secret values.
+
+    Production inherits Gmail's window if Zoho's setting is absent. The shadow
+    image's reviewed defaults are imap.zoho.com / Off-Market-Deals / 48 hours.
+    This preflight runs before authentication or any credential upload.
+    """
+    names = ("ZOHO_IMAP_HOST", "ZOHO_FOLDER", "ZOHO_LOOKBACK_HOURS", "EMAIL_LOOKBACK_HOURS")
+    settings = {name: environ.pop(name, "").strip() for name in names}
+    try:
+        hours_match = int(settings["ZOHO_LOOKBACK_HOURS"] or settings["EMAIL_LOOKBACK_HOURS"] or "48") == 48
+    except (ValueError, TypeError):
+        hours_match = False
+    matches = {
+        "ZOHO_HOST_MATCH": (settings["ZOHO_IMAP_HOST"] or "imap.zoho.com") == "imap.zoho.com",
+        "ZOHO_FOLDER_MATCH": (settings["ZOHO_FOLDER"] or "Off-Market-Deals") == "Off-Market-Deals",
+        "ZOHO_LOOKBACK_MATCH": hours_match,
+    }
+    for name, matched in matches.items():
+        print(f"{name}={str(matched).lower()}", file=output)
+    if not all(matches.values()):
+        raise TransferError("Zoho configuration differs from reviewed shadow defaults; nothing was uploaded.")
+
+
 def main() -> int:
-    if len(sys.argv) != 1:
-        print("This fixed-destination transfer accepts no arguments.", file=sys.stderr)
+    args = sys.argv[1:]
+    # Deliberately do not echo rejected arguments: they could contain payloads.
+    if args not in ([], ["--profile", "core"], ["--profile", "zoho"], ["--check-zoho-config"]):
+        print("Only a fixed core/zoho profile or Zoho configuration check is accepted.", file=sys.stderr)
         return 2
     try:
-        transfer_secrets(os.environ, sys.stdout)
+        if args == ["--check-zoho-config"]:
+            check_zoho_config(os.environ, sys.stdout)
+        elif args:
+            transfer_secrets(os.environ, sys.stdout, profile=args[1])
+        else:
+            # Preserve the original callable path as well as CLI behavior.
+            transfer_secrets(os.environ, sys.stdout)
     except TransferError as error:
         print(str(error), file=sys.stderr)
         return 1

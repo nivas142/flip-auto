@@ -21,7 +21,8 @@ EXPIRY = "2026-09-27T08:00:00Z"
 
 class FakeGcloud:
     """Exercise actual CLI argument construction without cloud/network access."""
-    def __init__(self):
+    def __init__(self, profile="core"):
+        self.profile = setup.PROFILES[profile]
         self.calls = []
         self.conditions = []
         self.failures = {}
@@ -31,12 +32,12 @@ class FakeGcloud:
         self.pool = None
         self.provider = None
         self.extra_providers = []
-        self.policies = {secret: {"bindings": []} for secret in setup.SECRETS}
+        self.policies = {secret: {"bindings": []} for secret in self.profile.secrets}
 
     def matching_resources(self):
-        self.pool = {"name": setup.POOL_RESOURCE, "state": "ACTIVE", "description": setup.POOL_DESCRIPTION}
+        self.pool = {"name": self.profile.pool_resource, "state": "ACTIVE", "description": self.profile.description}
         self.provider = {
-            "name": setup.PROVIDER_RESOURCE, "state": "ACTIVE", "attributeMapping": copy.deepcopy(setup.MAPPING),
+            "name": self.profile.provider_resource, "state": "ACTIVE", "attributeMapping": copy.deepcopy(setup.MAPPING),
             "attributeCondition": setup.ATTRIBUTE_CONDITION, "description": setup.DESCRIPTION_PREFIX + EXPIRY,
             "oidc": {"issuerUri": "https://token.actions.githubusercontent.com"},
         }
@@ -71,7 +72,7 @@ class FakeGcloud:
                 return subprocess.CompletedProcess(command, 1, "", "ERROR: NOT_FOUND: pool absent")
             result = self.pool
         elif positional[:3] == ["iam", "workload-identity-pools", "create"]:
-            self.pool = {"name": setup.POOL_RESOURCE, "state": "ACTIVE", "description": flags["description"]}
+            self.pool = {"name": self.profile.pool_resource, "state": "ACTIVE", "description": flags["description"]}
         elif positional[:4] == ["iam", "workload-identity-pools", "providers", "describe"]:
             if self.provider is None:
                 return subprocess.CompletedProcess(command, 1, "", "ERROR: NOT_FOUND: provider absent")
@@ -80,7 +81,7 @@ class FakeGcloud:
             result = ([self.provider] if self.provider else []) + self.extra_providers
         elif positional[:4] == ["iam", "workload-identity-pools", "providers", "create-oidc"]:
             self.provider = {
-                "name": setup.PROVIDER_RESOURCE, "state": "ACTIVE", "description": flags["description"],
+                "name": self.profile.provider_resource, "state": "ACTIVE", "description": flags["description"],
                 "attributeMapping": dict(pair.split("=", 1) for pair in flags["attribute-mapping"].split(",")),
                 "attributeCondition": flags["attribute-condition"], "oidc": {"issuerUri": flags["issuer-uri"]},
             }
@@ -88,7 +89,7 @@ class FakeGcloud:
             assert "--disabled" in args
             self.provider["disabled"] = True
         elif positional[0] == "secrets" and positional[1] in ("add-iam-policy-binding", "remove-iam-policy-binding"):
-            assert flags["member"] == setup.MEMBER and flags["role"] == setup.ROLE
+            assert flags["member"] == self.profile.member and flags["role"] == setup.ROLE
             condition = json.loads(Path(flags["condition-from-file"]).read_text())
             self.conditions.append(condition)
             policy = self.policies[positional[2]]["bindings"]
@@ -259,6 +260,76 @@ class TransferSetupTests(unittest.TestCase):
                         "2026-09-26T08:00:00Z", "2026-09-28T08:00:01Z", "2025-09-27T08:00:00Z"):
             with self.subTest(invalid=invalid), self.assertRaises(setup.SetupError):
                 setup.validate_expiry(invalid, now)
+
+
+class ZohoTransferSetupTests(unittest.TestCase):
+    def setUp(self):
+        self.fake = FakeGcloud("zoho")
+        self.profile = setup.PROFILES["zoho"]
+        self.subject = setup.Setup(setup.Gcloud(self.fake, lambda _: None), profile="zoho")
+        self.output = io.StringIO()
+
+    def test_zoho_apply_grants_only_two_selected_secrets_with_separate_identity(self):
+        with redirect_stdout(self.output):
+            self.subject.check_or_apply(EXPIRY, apply=True)
+        grants = [call for call in self.fake.calls if "add-iam-policy-binding" in call]
+        self.assertEqual([call[3] for call in grants], [
+            "flip-auto-zoho-email-username", "flip-auto-zoho-email-app-password",
+        ])
+        self.assertTrue(all(f"--member={self.profile.member}" in call for call in grants))
+        self.assertEqual(self.fake.conditions, [setup.expiry_condition(EXPIRY)] * 2)
+        self.assertEqual(self.fake.provider["name"], self.profile.provider_resource)
+        self.assertEqual(self.fake.provider["attributeCondition"], setup.ATTRIBUTE_CONDITION)
+        self.assertIn("--profile zoho --revoke", self.output.getvalue())
+        for call in self.fake.calls:
+            self.assertNotIn(setup.POOL, call)
+            self.assertNotIn(f"--workload-identity-pool={setup.POOL}", call)
+            self.assertFalse(setup.SECRETS and set(setup.SECRETS) & set(call))
+        self.fake.calls.clear()
+        with redirect_stdout(self.output):
+            self.subject.check_or_apply(EXPIRY, apply=True)
+        self.assertEqual(len(self.fake.mutations()), 1)  # API enable only.
+
+    def test_zoho_revoke_preserves_runtime_and_unselected_identity_grants(self):
+        self.fake.matching_resources()
+        expired = setup.expiry_condition("2020-01-01T00:00:00Z")
+        runtime_binding = {"role": "roles/secretmanager.secretAccessor", "members": [
+            "serviceAccount:flip-auto-shadow@flip-auto.iam.gserviceaccount.com",
+        ]}
+        unselected_binding = {"role": setup.ROLE, "members": [setup.MEMBER], "condition": expired}
+        for secret in self.profile.secrets:
+            self.fake.policies[secret]["bindings"] = [
+                {"role": setup.ROLE, "members": [self.profile.member], "condition": expired},
+                copy.deepcopy(runtime_binding), copy.deepcopy(unselected_binding),
+            ]
+        with redirect_stdout(self.output):
+            self.subject.revoke()
+        self.assertTrue(self.fake.provider["disabled"])
+        for policy in self.fake.policies.values():
+            self.assertEqual(policy["bindings"], [runtime_binding, unselected_binding])
+        self.assertEqual(len([call for call in self.fake.calls if "remove-iam-policy-binding" in call]), 2)
+        self.fake.calls.clear()
+        with redirect_stdout(self.output):
+            self.subject.revoke()
+        self.assertEqual(self.fake.mutations(), [])
+
+    def test_disabled_zoho_provider_is_never_reactivated(self):
+        self.fake.matching_resources()
+        self.fake.provider["disabled"] = True
+        with self.assertRaisesRegex(setup.SetupError, "Existing provider differs"):
+            self.subject.check_or_apply(EXPIRY, apply=True)
+        self.assertFalse(any("update-oidc" in call or "add-iam-policy-binding" in call for call in self.fake.calls))
+
+    def test_zoho_project_scope_grant_is_rejected(self):
+        self.fake.project_policy = {"bindings": [{"role": "roles/editor", "members": [self.profile.member]}]}
+        with self.assertRaisesRegex(setup.SetupError, "project-level"):
+            self.subject.check_or_apply(EXPIRY, apply=True)
+        self.assertEqual(self.fake.mutations(), [])
+
+    def test_unknown_profile_makes_no_cloud_calls(self):
+        with self.assertRaisesRegex(setup.SetupError, "Unknown transfer profile"):
+            setup.Setup(setup.Gcloud(self.fake), profile="arbitrary")
+        self.assertEqual(self.fake.calls, [])
 
 
 if __name__ == "__main__":

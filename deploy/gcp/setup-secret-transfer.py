@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owner-run, temporary direct WIF access for the three-secret GitHub transfer.
+"""Owner-run, temporary direct WIF access for a fixed GitHub transfer profile.
 
 Uses only Python's standard library and the operator's authenticated gcloud.
 Never reads secret values, creates keys/service accounts, or starts a workload.
@@ -47,6 +47,28 @@ CONDITION_TITLE = "flip-auto-secret-transfer-expiry"
 POOL_DESCRIPTION = "One-time GitHub transfer of three Flip Auto secrets."
 DESCRIPTION_PREFIX = "One-time GitHub secret transfer; expires-at="
 RETRY_DELAYS = (1, 2, 4, 8, 16)
+
+
+class TransferProfile:
+    def __init__(self, pool, secrets, description):
+        self.pool = pool
+        self.secrets = secrets
+        self.description = description
+        self.pool_resource = f"projects/{PROJECT_NUMBER}/locations/global/workloadIdentityPools/{pool}"
+        self.provider_resource = f"{self.pool_resource}/providers/{PROVIDER}"
+        self.member = f"principalSet://iam.googleapis.com/{self.pool_resource}/attribute.repository_id/1172251948"
+
+
+# Core stays byte-for-byte compatible with the completed original transfer.
+# Zoho uses a separate identity; it never re-enables the revoked core provider.
+PROFILES = {
+    "core": TransferProfile(POOL, SECRETS, POOL_DESCRIPTION),
+    "zoho": TransferProfile(
+        "flip-auto-zoho-secret-transfer",
+        ("flip-auto-zoho-email-username", "flip-auto-zoho-email-app-password"),
+        "One-time GitHub transfer of two Flip Auto Zoho secrets.",
+    ),
+}
 
 
 class SetupError(RuntimeError):
@@ -115,8 +137,12 @@ def owned_condition(condition):
 
 
 class Setup:
-    def __init__(self, gcloud):
+    def __init__(self, gcloud, profile="core"):
+        if profile not in PROFILES:
+            raise SetupError("Unknown transfer profile")
         self.gcloud = gcloud
+        self.profile = PROFILES[profile]
+        self.profile_name = profile
 
     def project(self, check_pool_grants=False):
         project = self.gcloud.run("projects", "describe", PROJECT)
@@ -125,27 +151,27 @@ class Setup:
             raise SetupError("Project identity/state mismatch; expected active flip-auto (941818435041)")
         if check_pool_grants:
             policy = self.gcloud.run("projects", "get-iam-policy", PROJECT)
-            if any(f"/{POOL_RESOURCE}" in member for binding in policy.get("bindings", [])
+            if any(f"/{self.profile.pool_resource}" in member for binding in policy.get("bindings", [])
                    for member in binding.get("members", [])):
                 raise SetupError("Unexpected project-level transfer-pool grant; only secret-level grants are allowed")
 
     def pool(self, **kwargs):
-        return self.gcloud.run("iam", "workload-identity-pools", "describe", POOL,
+        return self.gcloud.run("iam", "workload-identity-pools", "describe", self.profile.pool,
                                "--location=global", **kwargs)
 
     def provider(self, **kwargs):
         return self.gcloud.run("iam", "workload-identity-pools", "providers", "describe", PROVIDER,
-                               f"--workload-identity-pool={POOL}", "--location=global", **kwargs)
+                               f"--workload-identity-pool={self.profile.pool}", "--location=global", **kwargs)
 
     def validate_pool(self, pool):
-        if (pool.get("name") != POOL_RESOURCE or pool.get("state") != "ACTIVE"
+        if (pool.get("name") != self.profile.pool_resource or pool.get("state") != "ACTIVE"
                 or pool.get("disabled", False) or pool.get("mode", "FEDERATION_ONLY") != "FEDERATION_ONLY"
-                or pool.get("description") != POOL_DESCRIPTION):
+                or pool.get("description") != self.profile.description):
             raise SetupError("Existing pool differs or is disabled/deleted; refusing to alter or reuse it")
 
     def validate_provider(self, provider, expires_at):
         oidc = provider.get("oidc", {})
-        if (provider.get("name") != PROVIDER_RESOURCE or provider.get("state") != "ACTIVE"
+        if (provider.get("name") != self.profile.provider_resource or provider.get("state") != "ACTIVE"
                 or provider.get("disabled", False)
                 or provider.get("attributeMapping") != MAPPING
                 or provider.get("attributeCondition") != ATTRIBUTE_CONDITION
@@ -157,8 +183,8 @@ class Setup:
 
     def validate_only_provider(self):
         providers = self.gcloud.run("iam", "workload-identity-pools", "providers", "list",
-                                    f"--workload-identity-pool={POOL}", "--location=global", "--show-deleted")
-        if any(provider.get("name") != PROVIDER_RESOURCE for provider in providers):
+                                    f"--workload-identity-pool={self.profile.pool}", "--location=global", "--show-deleted")
+        if any(provider.get("name") != self.profile.provider_resource for provider in providers):
             raise SetupError("Unexpected additional provider in transfer pool; direct WIF requires a dedicated pool")
 
     def policy(self, secret, **kwargs):
@@ -169,7 +195,7 @@ class Setup:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", encoding="utf-8") as handle:
             json.dump(condition, handle)
             handle.flush()
-            self.gcloud.run("secrets", operation, secret, f"--member={MEMBER}", f"--role={ROLE}",
+            self.gcloud.run("secrets", operation, secret, f"--member={self.profile.member}", f"--role={ROLE}",
                             f"--condition-from-file={handle.name}", retry_not_found=retry)
 
     def check_or_apply(self, expires_at, apply=False):
@@ -186,15 +212,15 @@ class Setup:
 
         # Validate every preexisting resource before creating WIF or granting access.
         policies = {}
-        for secret in SECRETS:
+        for secret in self.profile.secrets:
             metadata = self.gcloud.run("secrets", "describe", secret)
             if metadata.get("name") != f"projects/{PROJECT_NUMBER}/secrets/{secret}":
                 raise SetupError(f"Secret identity mismatch: {secret}")
             policy = policies[secret] = self.policy(secret)
             for binding in policy.get("bindings", []):
                 members = binding.get("members", [])
-                pool_members = [member for member in members if f"/{POOL_RESOURCE}/" in member]
-                if pool_members and (pool_members != [MEMBER] or binding.get("role") != ROLE
+                pool_members = [member for member in members if f"/{self.profile.pool_resource}/" in member]
+                if pool_members and (pool_members != [self.profile.member] or binding.get("role") != ROLE
                                      or binding.get("condition") != expiry_condition(expires_at)):
                     raise SetupError(f"Unexpected transfer-pool permission on {secret}; refusing to extend access")
 
@@ -209,17 +235,17 @@ class Setup:
         if not apply:
             print(f"Read-only check passed for {PROJECT} ({PROJECT_NUMBER}).")
             print(f"Pool: {'reuse' if pool else 'create'}; provider: {'reuse' if provider else 'create'}; expiry: {expires_at}")
-            print("Apply grants only secretVersionAdder on the three named secrets. No values were read.")
+            print(f"Apply grants only secretVersionAdder on {len(self.profile.secrets)} selected secrets. No values were read.")
             return
 
         created = pool is None or provider is None
         if pool is None:
-            self.gcloud.run("iam", "workload-identity-pools", "create", POOL, "--location=global",
-                            "--display-name=Flip Auto secret transfer", f"--description={POOL_DESCRIPTION}")
+            self.gcloud.run("iam", "workload-identity-pools", "create", self.profile.pool, "--location=global",
+                            "--display-name=Flip Auto secret transfer", f"--description={self.profile.description}")
             self.validate_pool(self.pool(retry_not_found=True))
         if provider is None:
             self.gcloud.run("iam", "workload-identity-pools", "providers", "create-oidc", PROVIDER,
-                            f"--workload-identity-pool={POOL}", "--location=global",
+                            f"--workload-identity-pool={self.profile.pool}", "--location=global",
                             "--issuer-uri=https://token.actions.githubusercontent.com",
                             "--attribute-mapping=" + ",".join(f"{key}={value}" for key, value in MAPPING.items()),
                             f"--attribute-condition={ATTRIBUTE_CONDITION}",
@@ -227,30 +253,30 @@ class Setup:
             self.validate_provider(self.provider(retry_not_found=True), expires_at)
         self.validate_only_provider()
         for secret, policy in policies.items():
-            exists = any(binding.get("role") == ROLE and MEMBER in binding.get("members", [])
+            exists = any(binding.get("role") == ROLE and self.profile.member in binding.get("members", [])
                          and binding.get("condition") == expiry_condition(expires_at)
                          for binding in policy.get("bindings", []))
             if not exists:
                 self.binding("add-iam-policy-binding", secret, expiry_condition(expires_at), retry=created)
         print(f"Temporary transfer access configured; expires at {expires_at}.")
-        print(f"Provider: {PROVIDER_RESOURCE}")
-        print("Run --revoke immediately after transfer. No secret values were read or workloads started.")
+        print(f"Provider: {self.profile.provider_resource}")
+        print(f"Run --profile {self.profile_name} --revoke immediately after transfer. No secret values were read or workloads started.")
 
     def revoke(self):
         self.project()
         provider = self.provider(missing_ok=True)
         if provider is not None and provider.get("state") != "DELETED" and not provider.get("disabled", False):
-            if provider.get("name") != PROVIDER_RESOURCE:
+            if provider.get("name") != self.profile.provider_resource:
                 raise SetupError("Provider identity mismatch; refusing to disable a different resource")
             self.gcloud.run("iam", "workload-identity-pools", "providers", "update-oidc", PROVIDER,
-                            f"--workload-identity-pool={POOL}", "--location=global", "--disabled")
+                            f"--workload-identity-pool={self.profile.pool}", "--location=global", "--disabled")
         # Disabling stops fresh tokens; remove IAM grants too, including expired grants.
-        for secret in SECRETS:
+        for secret in self.profile.secrets:
             policy = self.policy(secret, missing_ok=True)
             if policy is None:
                 continue
             for binding in policy.get("bindings", []):
-                if (binding.get("role") == ROLE and MEMBER in binding.get("members", [])
+                if (binding.get("role") == ROLE and self.profile.member in binding.get("members", [])
                         and owned_condition(binding.get("condition"))):
                     self.binding("remove-iam-policy-binding", secret, binding["condition"])
         print("Transfer provider disabled/absent; all matching temporary grants removed.")
@@ -263,10 +289,11 @@ def main(argv=None):
     actions.add_argument("--check", action="store_true", help="Read-only cloud preflight")
     actions.add_argument("--apply", action="store_true", help="Enable APIs and configure temporary direct WIF")
     actions.add_argument("--revoke", action="store_true", help="Disable provider and remove owned grants, including expired grants")
+    parser.add_argument("--profile", choices=tuple(PROFILES), default="core", help="Fixed secret set; core preserves the original three-secret transfer")
     parser.add_argument("--expires-at", help="Required for check/apply; fixed UTC deadline within 48 hours")
     args = parser.parse_args(argv)
     try:
-        setup = Setup(Gcloud())
+        setup = Setup(Gcloud(), profile=args.profile)
         if args.revoke:
             setup.revoke()
         else:
