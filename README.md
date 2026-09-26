@@ -254,3 +254,16 @@ Use Task Scheduler to run:
 
 - If both `telegram.enabled` and `twilio.enabled` are `false`, the script prints matches instead of sending alerts.
 - State is stored in `state/monitor_state.json`.
+
+## GCP migration (staged; not deployed)
+
+The [phase-one GCP runbook](docs/gcp-migration.md) prepares a Cloud Run Job,
+isolated Firestore state, Secret Manager bindings, and optional Cloud Scheduler.
+`gcp_runtime.py` supports shadow mode only: read-only mailbox scans, no new CMA
+requests, no callback deletion, and no Telegram/SMS delivery. It refuses live mode.
+Existing GitHub scheduling and the Cloudflare callback receiver stay unchanged.
+
+Do not treat the existing notifier-disabled dry run as shadow mode: it can still
+request reports, consume callbacks, and mutate production state. Use the dedicated
+GCP runner and isolated state for migration testing. Deployment and production
+cutover require the explicit setup and validation gates in the runbook.
