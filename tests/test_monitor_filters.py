@@ -175,6 +175,61 @@ class MonitorFilterTests(unittest.TestCase):
         delete_mock.assert_called_once()
         self.assertIn(request_key, state["cma_reports_processed"])
 
+    def test_unavailable_callback_is_retained_with_safe_diagnostics(self):
+        deal = monitor.PropertyDeal(
+            city="Mesa",
+            address="123 Main St, Mesa, AZ 85201",
+            price="$300,000",
+            details_url="",
+            image_url="",
+            summary="3 beds 2 baths 1,500 sqft built 1990",
+        )
+        request_key = monitor.cma_address_hash(deal.address)
+        state = {"cma_requests": {request_key: datetime.now(timezone.utc).isoformat()}}
+        cfg = {
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
+            "max_report_mb": 80,
+        }
+        unavailable = ValuationResult(
+            status="unavailable",
+            source="cloud_cma_armls_comps",
+            arv_low=None,
+            arv_likely=None,
+            arv_high=None,
+            confidence="insufficient",
+            subject_square_footage=1_500,
+            comparables=(),
+            reason="only 0 eligible closed comps",
+        )
+        payload = {
+            "subjectProperty": {},
+            "comparables": [],
+            "parseDiagnostics": {
+                "pageCount": 42,
+                "closedPageCount": 8,
+                "parsedClosedComparables": 0,
+            },
+        }
+        with (
+            patch.object(monitor, "fetch_result", return_value="https://cloudcma.com/pdf/abc"),
+            patch.object(monitor, "download_cloud_cma_pdf", return_value=b"%PDF report") as download_mock,
+            patch.object(monitor, "parse_cloud_cma_pdf", return_value=payload),
+            patch.object(monitor, "calculate_comp_valuation", return_value=unavailable),
+            patch.object(monitor, "delete_result") as delete_mock,
+        ):
+            first = monitor.request_cloud_cma_for_deal(deal, cfg, state, [0])
+            second = monitor.request_cloud_cma_for_deal(deal, cfg, state, [0])
+
+        self.assertEqual(first.status, "unavailable")
+        self.assertEqual(second.status, "unavailable")
+        self.assertEqual(download_mock.call_count, 1)
+        delete_mock.assert_not_called()
+        record = state["cma_reports_unavailable"][request_key]
+        self.assertEqual(record["parsed_closed_comps"], 0)
+        self.assertEqual(record["closed_page_count"], 8)
+        self.assertNotIn("Main St", str(record))
+
     def test_oversized_callback_is_deleted_and_not_downloaded_again(self):
         deal = monitor.PropertyDeal(
             city="Mesa",
