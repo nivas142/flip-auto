@@ -131,6 +131,44 @@ class ReplayTests(unittest.TestCase):
             result = replay.run_replay(PDF)
         self.assertTrue(result["baseline_verified"])
 
+    def test_mismatch_logs_evidence_and_still_exits_nonzero(self):
+        self.fixture()
+        output, errors = io.StringIO(), io.StringIO()
+        with patch.object(replay, "EXPECTED_RESULT_SHA256", "0" * 64), \
+                patch.object(replay.cloud_cma, "download_cloud_cma_pdf", return_value=PDF), \
+                patch("sys.stdout", output), patch("sys.stderr", errors):
+            self.assertEqual(replay.main(), 1)
+        line = output.getvalue().strip()
+        self.assertTrue(line.startswith("[CMA_REPLAY_DIAGNOSTIC] "))
+        result = json.loads(line.removeprefix("[CMA_REPLAY_DIAGNOSTIC] "))
+        self.assertFalse(result["baseline_verified"])
+        self.assertEqual(result["expected_result_sha256"], "0" * 64)
+        self.assertNotEqual(result["result_sha256"], result["expected_result_sha256"])
+        self.assertEqual(result["result_sha256"], replay.digest(result["results"]))
+        self.assertEqual(len(result["selected_comparables"]), 4)
+        self.assertEqual(result["selected_comparables"][0]["year_built"], 1997)
+        self.assertIn("pypdf_version", result)
+        self.assertIn("python_version", result)
+        self.assertEqual(result["side_effects"]["alerts_sent"], 0)
+        self.assertNotIn(replay.REPORT_URL, line)
+        self.assertNotIn("[CMA_REPLAY]", output.getvalue())
+        self.assertIn("results differ", errors.getvalue())
+
+    def test_original_deployed_parser_remains_checked_against_same_result(self):
+        self.fixture()
+        source_hash = replay.EXPECTED_MODULE_SHA256["cloud_cma"]
+        expected_hash = replay.run_replay(PDF)["result_sha256"]
+        current_profile = {**replay.EXPECTED_MODULE_SHA256, "cloud_cma": "1" * 64}
+        with patch.object(replay, "EXPECTED_MODULE_SHA256", current_profile), \
+                patch.object(replay, "DEPLOYED_CLOUD_CMA_SHA256", source_hash), \
+                patch.object(replay, "EXPECTED_RESULT_SHA256", expected_hash):
+            result = replay.run_replay(PDF)
+            self.assertEqual(result["module_profile"], "original-deployed-parser")
+            self.assertTrue(result["baseline_verified"])
+            with patch.object(replay, "EXPECTED_RESULT_SHA256", "0" * 64):
+                with self.assertRaisesRegex(replay.ReplayError, "results differ"):
+                    replay.run_replay(PDF)
+
     def test_unexpected_failure_is_nonzero_and_redacted(self):
         output = io.StringIO()
         with patch.object(replay, "run_replay", side_effect=ValueError("private-url-token")), patch("sys.stderr", output):
@@ -288,16 +326,14 @@ class ReplaySetupTests(unittest.TestCase):
                 self.assertEqual(namespace["main"](["--inspect", setup.JOB + "-abcde"]), 0)
             inspect.assert_called_once_with(setup.JOB + "-abcde")
 
-    def test_inspect_rejects_wrong_resource_or_image_before_log_access(self):
-        for change in ("name", "label", "image", "timestamp", "project"):
+    def test_inspect_rejects_wrong_resource_before_log_access(self):
+        for change in ("name", "label", "timestamp", "project"):
             with self.subTest(change=change):
                 cloud = FakeGcloud()
                 if change == "name":
                     cloud.execution["metadata"]["name"] = "flip-auto-shadow-abcde"
                 elif change == "label":
                     cloud.execution["metadata"]["labels"]["run.googleapis.com/job"] = "flip-auto-shadow"
-                elif change == "image":
-                    cloud.execution["spec"]["template"]["spec"]["containers"][0]["image"] = "different-image"
                 elif change == "timestamp":
                     cloud.execution["status"]["startTime"] = "2026-09-26T16:45:10"
                 else:
@@ -309,6 +345,68 @@ class ReplaySetupTests(unittest.TestCase):
         with self.assertRaises(setup.SetupError):
             setup.inspect_execution("flip-auto-shadow-abcde", cloud, io.StringIO())
         self.assertEqual(cloud.calls, [])
+
+    def test_unverified_image_allows_scoped_diagnostics_but_never_success(self):
+        for change, message in (
+            ("missing_image", "image is absent"),
+            ("missing_spec", "image is absent"),
+            ("different_image", "image differs"),
+            ("extra_container", "Expected one replay execution container"),
+        ):
+            with self.subTest(change=change):
+                cloud = FakeGcloud()
+                output = io.StringIO()
+                containers = cloud.execution["spec"]["template"]["spec"]["containers"]
+                if change == "missing_image":
+                    containers[0].pop("image")
+                elif change == "missing_spec":
+                    cloud.execution.pop("spec")
+                elif change == "different_image":
+                    containers[0]["image"] = "different-image"
+                else:
+                    containers.append({"image": setup.IMAGE})
+                with self.assertRaisesRegex(setup.SetupError, message):
+                    setup.inspect_execution(setup.JOB + "-abcde", cloud, output)
+                logs = [args for args, _ in cloud.calls if args[:2] == ("logging", "read")]
+                self.assertEqual(len(logs), 1)
+                self.assertIn('execution_name"="flip-auto-cma-replay-abcde"', logs[0][2])
+                self.assertIn(message, output.getvalue())
+                self.assertIn("[CMA_REPLAY]", output.getvalue())
+                self.assertNotIn("completed. Normal shadow state", output.getvalue())
+                self.assertFalse(any(args[:3] in {
+                    ("run", "jobs", "execute"), ("run", "jobs", "update"),
+                    ("run", "jobs", "create"), ("run", "jobs", "delete"),
+                } for args, _ in cloud.calls))
+
+    def test_failed_execution_with_omitted_image_exposes_mismatch_diagnostics(self):
+        cloud = FakeGcloud()
+        output = io.StringIO()
+        cloud.execution["spec"]["template"]["spec"]["containers"][0].pop("image")
+        cloud.execution["status"].update(
+            succeededCount=0, failedCount=1,
+            conditions=[{"type": "Completed", "status": "False"}],
+        )
+        diagnostic = '[CMA_REPLAY_DIAGNOSTIC] {"baseline_verified": false, "result_sha256": "fixture"}'
+        error = "[CMA_REPLAY_ERROR] Replay results differ from the reviewed baseline"
+        cloud.logs = [{"textPayload": error}, {"textPayload": diagnostic}]
+        with self.assertRaisesRegex(setup.SetupError, "did not complete successfully"):
+            setup.inspect_execution(setup.JOB + "-abcde", cloud, output)
+        text = output.getvalue()
+        self.assertIn("failedCount=1", text)
+        self.assertIn("image is absent", text)
+        self.assertNotIn("image differs", text)
+        self.assertIn(diagnostic, text)
+        self.assertIn(error, text)
+        self.assertLess(text.index("failedCount=1"), text.index(diagnostic))
+        query = next(args[2] for args, _ in cloud.calls if args[:2] == ("logging", "read"))
+        self.assertIn('textPayload:"[CMA_REPLAY_DIAGNOSTIC]"', query)
+        self.assertNotIn("completed. Normal shadow state", text)
+
+    def test_diagnostic_log_cannot_be_hidden_by_a_verified_result(self):
+        cloud = FakeGcloud()
+        cloud.logs.append({"textPayload": '[CMA_REPLAY_DIAGNOSTIC] {"baseline_verified": false}'})
+        with self.assertRaisesRegex(setup.SetupError, "emitted mismatch diagnostics"):
+            setup.inspect_execution(setup.JOB + "-abcde", cloud, io.StringIO())
 
     def test_log_timeout_reports_task_status_but_never_replay_success(self):
         cloud = FakeGcloud()

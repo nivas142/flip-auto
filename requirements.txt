@@ -2,4 +2,5 @@ PyYAML>=6.0
 beautifulsoup4>=4.12
 gspread>=6.0
 google-auth>=2.0
-pypdf>=6.0
+# PDF text layout affects comp facts and valuation; upgrade with the CMA replay.
+pypdf==6.19.0

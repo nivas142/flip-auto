@@ -119,16 +119,22 @@ def validate_execution_name(execution_name):
 
 
 def execution_image(resource):
+    """Return an available image, distinguishing omission from a mismatch."""
     try:
         containers = resource["spec"]["template"]["spec"]["containers"]
     except (KeyError, TypeError):
         try:
             containers = resource["template"]["containers"]
-        except (KeyError, TypeError) as exc:
-            raise SetupError("Cannot verify the replay execution image") from exc
+        except (KeyError, TypeError):
+            return None
     if not isinstance(containers, list) or len(containers) != 1:
         raise SetupError("Expected one replay execution container")
-    return containers[0].get("image")
+    if not isinstance(containers[0], dict):
+        raise SetupError("Unexpected replay execution container response")
+    image = containers[0].get("image")
+    if image is not None and not isinstance(image, str):
+        raise SetupError("Unexpected replay execution image response")
+    return image or None
 
 
 def log_time_bounds(execution, now=None):
@@ -174,8 +180,17 @@ def inspect_execution(execution_name, gcloud=None, output=None, sleeper=None,
         job_label = (execution.get("metadata", {}).get("labels") or {}).get("run.googleapis.com/job")
         if job_label is not None and job_label != JOB:
             raise SetupError("Returned execution belongs to a different job")
-        if execution_image(execution) != IMAGE:
-            raise SetupError("Replay execution image differs from the reviewed replay image")
+        # Image verification gates success, not read-only diagnostics. Some
+        # execution responses omit the image; that is not proof of a mismatch.
+        image_issue = None
+        try:
+            image = execution_image(execution)
+            if image is None:
+                image_issue = "Replay execution image is absent from the response; baseline cannot be verified"
+            elif image != IMAGE:
+                image_issue = "Replay execution image differs from the reviewed replay image"
+        except SetupError as exc:
+            image_issue = str(exc)
         status = execution.get("status") or {}
         completed = any(
             item.get("type") == "Completed" and str(item.get("status")).lower() == "true"
@@ -184,9 +199,13 @@ def inspect_execution(execution_name, gcloud=None, output=None, sleeper=None,
         task_succeeded = completed and int(status.get("succeededCount", 0)) == 1
         print(
             f"Execution {execution_name}: task {'succeeded' if task_succeeded else 'not confirmed successful'}; "
-            f"succeededCount={status.get('succeededCount', 0)}. Replay baseline is not yet verified.",
+            f"succeededCount={status.get('succeededCount', 0)}; "
+            f"failedCount={status.get('failedCount', 0)}. Replay baseline is not yet verified.",
             file=output, flush=True,
         )
+        if image_issue:
+            print(f"Image verification: {image_issue}. Reading only this execution's diagnostics.",
+                  file=output, flush=True)
         lower, upper = log_time_bounds(execution)
         log_filter = (
             'resource.type="cloud_run_job" '
@@ -194,10 +213,12 @@ def inspect_execution(execution_name, gcloud=None, output=None, sleeper=None,
             f'AND resource.labels.location="{REGION}" '
             f'AND labels."run.googleapis.com/execution_name"="{execution_name}" '
             f'AND timestamp>="{lower}" AND timestamp<="{upper}" '
-            'AND (textPayload:"[CMA_REPLAY]" OR textPayload:"[CMA_REPLAY_ERROR]")'
+            'AND (textPayload:"[CMA_REPLAY]" OR textPayload:"[CMA_REPLAY_ERROR]" '
+            'OR textPayload:"[CMA_REPLAY_DIAGNOSTIC]")'
         )
         replay_results = []
         replay_errors = False
+        replay_diagnostics = False
         for attempt in range(2):
             try:
                 logs = gcloud.run(
@@ -224,7 +245,9 @@ def inspect_execution(execution_name, gcloud=None, output=None, sleeper=None,
                         replay_results.append(result)
                     if text.startswith("[CMA_REPLAY_ERROR] "):
                         replay_errors = True
-                    if text.startswith(("[CMA_REPLAY] ", "[CMA_REPLAY_ERROR] ")):
+                    if text.startswith("[CMA_REPLAY_DIAGNOSTIC] "):
+                        replay_diagnostics = True
+                    if text.startswith(("[CMA_REPLAY] ", "[CMA_REPLAY_ERROR] ", "[CMA_REPLAY_DIAGNOSTIC] ")):
                         print(text, file=output, flush=True)
                 break
             if attempt == 0:
@@ -233,8 +256,12 @@ def inspect_execution(execution_name, gcloud=None, output=None, sleeper=None,
             raise SetupError(f"Replay execution {execution_name} did not complete successfully")
         if not execute_wait_succeeded:
             raise SetupError("Execute wait did not confirm completion; inspect the existing execution to confirm its result")
+        if image_issue:
+            raise SetupError(image_issue)
         if replay_errors:
             raise SetupError("Replay execution emitted an error; baseline is not verified")
+        if replay_diagnostics:
+            raise SetupError("Replay execution emitted mismatch diagnostics; baseline is not verified")
         if len(replay_results) != 1:
             raise SetupError("No single replay result log is available yet; baseline remains unconfirmed")
         if replay_results[0].get("baseline_verified") is not True:
