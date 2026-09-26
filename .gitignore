@@ -4,6 +4,7 @@ worker/wrangler.toml
 
 # Local/private credentials
 creds/*.json
+gha-creds-*.json
 
 # Python artifacts
 __pycache__/

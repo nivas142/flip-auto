@@ -263,6 +263,10 @@ isolated Firestore state, Secret Manager bindings, and optional Cloud Scheduler.
 requests, no callback deletion, and no Telegram/SMS delivery. It refuses live mode.
 Existing GitHub scheduling and the Cloudflare callback receiver stay unchanged.
 
+If the required credentials exist only in GitHub Secrets, use the
+[one-time secret transfer](docs/gcp-secret-transfer.md). Its manual workflow uses
+temporary, secret-specific GCP permissions and does not deploy or run the scanner.
+
 Do not treat the existing notifier-disabled dry run as shadow mode: it can still
 request reports, consume callbacks, and mutate production state. Use the dedicated
 GCP runner and isolated state for migration testing. Deployment and production

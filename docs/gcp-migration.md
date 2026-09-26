@@ -29,9 +29,11 @@ race prevents an apples-to-apples comparison.
 
 ## 1. Required decisions and permissions
 
-Select a dedicated GCP project when practical. `us-central1` is the proposed
-region, not a silently selected deployment target. Confirm billing is enabled
-and that the region is suitable for mailbox/property data. Review current prices
+The owner confirmed project ID `flip-auto` (number `941818435041`), enabled billing,
+and created the registry and named database in `us-central1` on September 26, 2026.
+The runtime service account, database-scoped permission, and three empty secret
+containers with runtime access were also confirmed by Cloud Shell output.
+Check actual cloud state before deployment. Review current prices
 for Cloud Run Jobs, Firestore, Scheduler, Secret Manager, Artifact Registry,
 logging, and outbound network traffic. Budget alerts notify; they do not cap
 spend. This package does not create a budget or enable billing.
@@ -65,7 +67,7 @@ Do not put unrelated or production data in it during shadow testing.
 From the repository root, set explicit values. Do not change `gcloud` defaults:
 
 ```bash
-export FLIP_AUTO_GCP_PROJECT_ID='REPLACE_WITH_APPROVED_PROJECT_ID'
+export FLIP_AUTO_GCP_PROJECT_ID='flip-auto'
 export FLIP_AUTO_GCP_REGION='us-central1'
 gcloud projects describe "$FLIP_AUTO_GCP_PROJECT_ID"
 gcloud billing projects describe "$FLIP_AUTO_GCP_PROJECT_ID"
@@ -110,7 +112,9 @@ Phase 1 needs these Secret Manager secrets (same project):
 | `flip-auto-email-app-password` | `EMAIL_APP_PASSWORD` |
 | `flip-auto-cma-webhook-secret` | `CLOUD_CMA_WEBHOOK_SECRET` |
 
-Create them in the Secret Manager console and add the selected values there.
+If the values exist only in GitHub Secrets, follow the
+[one-time transfer instructions](gcp-secret-transfer.md). Otherwise add the
+selected values in the Secret Manager console.
 Do not paste credentials into this document, chat, git, shell command arguments,
 Docker build arguments, logs, or source configuration. Record the numeric version
 of each value; the deployment pins versions rather than using `latest`.
@@ -138,10 +142,13 @@ Optional Zoho: create/grant separate username/password secrets and bind them to
 unconfirmed account. Optional Sheets: only an already-approved public CSV URL is
 supported in this phase; never make a private sheet public to accommodate it.
 
-GitHub secret values cannot be downloaded through the normal secrets API. Any
-future one-time transfer workflow must use narrow Workload Identity Federation,
-explicit allowlisted secret names, and a manual protected trigger. No such
-transfer is performed by these scripts. Do not create service-account keys.
+GitHub secret values cannot be downloaded through the normal secrets API. The
+separate manual `transfer-gcp-secrets.yml` workflow copies only the three names
+above using direct Workload Identity Federation and expiring write-only grants.
+It uses the existing `main` GitHub environment. GCP also restricts the identity
+to the exact repository IDs, main branch, workflow path, environment and manual
+event. See the transfer instructions for setup, verification and revocation.
+No transfer occurs on push, pull request, or merge. Do not create service-account keys.
 
 ## 4. Build and create the shadow Job
 
