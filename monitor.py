@@ -35,6 +35,7 @@ import yaml
 from bs4 import BeautifulSoup
 
 from cloud_cma import (
+    CLOUD_CMA_PARSER_VERSION,
     CloudCmaReportTooLarge,
     download_cloud_cma_pdf,
     parse_cloud_cma_pdf,
@@ -481,8 +482,14 @@ def stable_id(parts: list[str]) -> str:
 
 
 def cma_address_hash(address: str) -> str:
-    """Hash addresses before persisting request state in the repository."""
-    return stable_id(["cloud-cma", normalize_address_key(address)])
+    """Hash addresses and parser generation before persisting request state."""
+    return stable_id(
+        [
+            "cloud-cma",
+            f"parser-v{CLOUD_CMA_PARSER_VERSION}",
+            normalize_address_key(address),
+        ]
+    )
 
 
 def _parse_state_timestamp(value: str) -> datetime | None:
@@ -522,6 +529,19 @@ def prune_cma_state(state: dict[str, Any], valuation_cfg: dict[str, Any]) -> Non
         if (_parse_state_timestamp(str(timestamp)) or datetime.min.replace(tzinfo=UTC)) >= cutoff
     }
 
+    unavailable = state.setdefault("cma_reports_unavailable", {})
+    state["cma_reports_unavailable"] = {
+        key: record
+        for key, record in unavailable.items()
+        if (
+            _parse_state_timestamp(
+                str(record.get("timestamp", "")) if isinstance(record, dict) else str(record)
+            )
+            or datetime.min.replace(tzinfo=UTC)
+        )
+        >= cutoff
+    }
+
 
 def _cloud_cma_request_count_today(state: dict[str, Any]) -> int:
     today = datetime.now(UTC).date()
@@ -541,6 +561,15 @@ def request_cloud_cma_for_deal(
     """Request at most one report per address within the configured TTL."""
     request_key = cma_address_hash(deal.address)
     requests = state.setdefault("cma_requests", {})
+    unavailable_reports = state.setdefault("cma_reports_unavailable", {})
+    unavailable_record = unavailable_reports.get(request_key)
+    if (
+        isinstance(unavailable_record, dict)
+        and int(unavailable_record.get("parser_version", 0)) == CLOUD_CMA_PARSER_VERSION
+    ):
+        return unavailable_valuation(
+            str(unavailable_record.get("reason") or "Cloud CMA valuation unavailable")
+        )
     if request_key in state.setdefault("cma_reports_rejected", {}):
         return unavailable_valuation("Cloud CMA report exceeded the safe download limit")
     if request_key in requests:
@@ -588,12 +617,36 @@ def request_cloud_cma_for_deal(
         )
         payload["subjectProperty"] = subject
         valuation = calculate_comp_valuation(payload, valuation_cfg)
-        delete_result(
-            str(valuation_cfg.get("callback_base_url") or ""),
-            request_key,
-            str(valuation_cfg.get("callback_secret") or ""),
-        )
-        state.setdefault("cma_reports_processed", {})[request_key] = datetime.now(UTC).isoformat()
+        diagnostics = dict(payload.get("parseDiagnostics") or {})
+        if valuation.status == "complete":
+            delete_result(
+                str(valuation_cfg.get("callback_base_url") or ""),
+                request_key,
+                str(valuation_cfg.get("callback_secret") or ""),
+            )
+            state.setdefault("cma_reports_processed", {})[request_key] = datetime.now(UTC).isoformat()
+            unavailable_reports.pop(request_key, None)
+        else:
+            unavailable_reports[request_key] = {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "parser_version": CLOUD_CMA_PARSER_VERSION,
+                "reason": valuation.reason or "valuation unavailable",
+                "subject_sqft_available": valuation.subject_square_footage is not None,
+                "page_count": int(diagnostics.get("pageCount", 0)),
+                "closed_page_count": int(diagnostics.get("closedPageCount", 0)),
+                "parsed_closed_comps": int(diagnostics.get("parsedClosedComparables", 0)),
+                "eligible_closed_comps": len(valuation.comparables),
+            }
+            print(
+                "[WARN] Cloud CMA valuation unavailable "
+                f"(request={request_key[:12]}, reason={valuation.reason or 'unknown'}, "
+                f"pages={int(diagnostics.get('pageCount', 0))}, "
+                f"closed_pages={int(diagnostics.get('closedPageCount', 0))}, "
+                f"parsed_closed={int(diagnostics.get('parsedClosedComparables', 0))}, "
+                f"eligible_closed={len(valuation.comparables)}). "
+                "The callback report was retained for parser recovery.",
+                file=sys.stderr,
+            )
         return valuation
     if request_budget[0] <= 0:
         return pending_valuation("Cloud CMA request queue is rate limited")
@@ -1071,8 +1124,9 @@ def scan_email_account(
                         )
                     except Exception as exc:
                         print(
-                            f"[WARN] Cloud CMA request failed for {deal.address} "
-                            f"({exc.__class__.__name__}: {exc}).",
+                            "[WARN] Cloud CMA request failed "
+                            f"(request={cma_address_hash(deal.address)[:12]}, "
+                            f"{exc.__class__.__name__}: {exc}).",
                             file=sys.stderr,
                         )
                         valuation = unavailable_valuation(str(exc))

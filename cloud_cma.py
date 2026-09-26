@@ -27,6 +27,7 @@ META_REFRESH_RE = re.compile(
 )
 DEFAULT_MAX_REPORT_BYTES = 200 * 1024 * 1024
 MAX_WRAPPER_BYTES = 2 * 1024 * 1024
+CLOUD_CMA_PARSER_VERSION = 2
 
 
 class CloudCmaReportTooLarge(ValueError):
@@ -180,23 +181,55 @@ def _float(value: str) -> float | None:
         return None
 
 
-def _parse_short_date(value: str) -> date | None:
-    try:
-        return datetime.strptime(value.strip(), "%m/%d/%y").date()
-    except (TypeError, ValueError):
-        return None
+def _parse_report_date(value: str) -> date | None:
+    cleaned = (value or "").strip()
+    for date_format in ("%m/%d/%y", "%m/%d/%Y", "%m-%d-%y", "%m-%d-%Y"):
+        try:
+            return datetime.strptime(cleaned, date_format).date()
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _labeled_value(labels: tuple[str, ...], text: str, value_pattern: str) -> str:
+    label_pattern = "|".join(re.escape(label) for label in labels)
+    return _field(
+        rf"(?<!\w)(?:{label_pattern})(?!\w)\s*(?:[#:=-]\s*)*({value_pattern})",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
+def _listing_address(page: str, mls_number: str) -> str:
+    """Best-effort display address; valuation never depends on this field."""
+    match = re.search(
+        r"(?P<address>\d{1,6}\s+.{2,100}?\b(?:"
+        r"Street|St|Road|Rd|Drive|Dr|Lane|Ln|Avenue|Ave|Court|Ct|Way|Place|Pl|"
+        r"Boulevard|Blvd|Trail|Trl|Circle|Cir|Parkway|Pkwy"
+        r")\b(?:\s+(?:#|Unit\s+)?[A-Za-z0-9-]+)?)\s*,?\s+"
+        r"(?P<city>[A-Za-z][A-Za-z .'-]{1,40})\s*,\s*"
+        r"(?P<state>[A-Z]{2})\s+(?P<zip>\d{5})",
+        page,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return f"MLS #{mls_number}"
+    return (
+        f"{_clean(match.group('address'))}, {_clean(match.group('city'))}, "
+        f"{match.group('state').upper()} {match.group('zip')}"
+    )
 
 
 def _subject_from_pages(pages: list[str], requested_address: str) -> dict[str, Any]:
     subject: dict[str, Any] = {"formattedAddress": requested_address}
     for page in pages:
-        if "Map of Comparable Listings" not in page:
+        if not re.search(r"Map\s+of\s+Comparable\s+Listings", page, re.IGNORECASE):
             continue
         match = re.search(
             r"\bSubject\s+(?P<address>.+?)\s+(?P<beds>\d+(?:\.\d+)?)\s+"
-            r"(?P<baths>\d+(?:\.\d+)?)\s+(?P<sqft>[\d,]+)\s+-",
+            r"(?P<baths>\d+(?:\.\d+)?)\s+(?P<sqft>[\d,]+)\s+(?:-|N/?A)",
             page,
-            re.IGNORECASE,
+            re.IGNORECASE | re.DOTALL,
         )
         if not match:
             continue
@@ -213,30 +246,66 @@ def _subject_from_pages(pages: list[str], requested_address: str) -> dict[str, A
 
 
 def _parse_closed_detail_page(page: str, *, as_of: date) -> dict[str, Any] | None:
-    if not re.search(r"\bCLOSED\b", page, re.IGNORECASE):
+    if not re.search(r"\b(?:CLOSED|SOLD)\b", page, re.IGNORECASE):
         return None
-    header = re.search(
-        r"^(?P<address>\d{1,6}\s+.+)(?P<city>[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}),\s*"
-        r"(?P<state>[A-Z]{2})\s+(?P<zip>\d{5})\s+"
-        r"MLS\s*#(?P<mls>[A-Za-z0-9-]+)",
+
+    mls_number = _labeled_value(("MLS", "MLS #", "MLS No"), page, r"[A-Za-z0-9-]+")
+    if not mls_number:
+        return None
+
+    date_token = r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"
+    sold_date_text = _labeled_value(
+        ("Sold date", "Close date", "Closed date", "COE date", "Close of escrow"),
         page,
-        re.MULTILINE,
+        date_token,
+    )
+    if not sold_date_text:
+        sold_date_text = _field(
+            rf"\b(?:CLOSED|SOLD)\b\s*[:#-]?\s*({date_token})",
+            page,
+            flags=re.IGNORECASE,
+        )
+    sold_date = _parse_report_date(sold_date_text)
+    if not sold_date:
+        return None
+
+    sold_price_text = _labeled_value(
+        ("Sold price", "Close price", "Closed price", "Sale price"),
+        page,
+        r"\$?[\d,]+",
     )
     summary = re.search(
         r"\$(?P<price>[\d,]+)\s+"
-        r"(?P<beds>\d+(?:\.\d+)?)\s+Beds\s*"
-        r"(?P<baths>\d+(?:\.\d+)?)\s+Baths\s+"
-        r"(?P<sqft>[\d,]+)\s+Sq\.\s*Ft\.\s*.*?"
-        r"CLOSED\s+(?P<sold_date>\d{1,2}/\d{1,2}/\d{2}).*?"
-        r"Year Built\s*(?P<year>\d{4}).*?"
-        r"Days on market:\s*(?P<dom>\d+)",
+        r"(?P<beds>\d+(?:\.\d+)?)\s+Beds?\s*"
+        r"(?P<baths>\d+(?:\.\d+)?)\s+Baths?\s+"
+        r"(?P<sqft>[\d,]+)\s+(?:Sq\.?\s*Ft\.?|SQFT|SF)\b",
         page,
         re.IGNORECASE | re.DOTALL,
     )
-    if not header or not summary:
+    if not sold_price_text and summary:
+        # Cloud CMA displays the closed price as the headline amount on closed
+        # listing detail pages. It is not taken from List Price/Original Price.
+        sold_price_text = summary.group("price")
+
+    beds_text = _labeled_value(("Beds", "Bedrooms", "Total bedrooms"), page, r"\d+(?:\.\d+)?")
+    baths_text = _labeled_value(("Baths", "Bathrooms", "Total bathrooms"), page, r"\d+(?:\.\d+)?")
+    sqft_text = _labeled_value(
+        ("Living area", "Square feet", "Sq ft", "Sqft", "Approx sqft"),
+        page,
+        r"[\d,]+",
+    )
+    if summary:
+        # The headline layout is value-before-label ("4 Beds 3 Baths").
+        # Prefer its explicitly paired captures over label-first field parsing.
+        beds_text = summary.group("beds")
+        baths_text = summary.group("baths")
+        sqft_text = summary.group("sqft")
+
+    sold_price = _integer(sold_price_text)
+    square_footage = _integer(sqft_text)
+    if not sold_price or not square_footage:
         return None
 
-    sold_date = _parse_short_date(summary.group("sold_date"))
     days_old = (as_of - sold_date).days if sold_date else 9999
     subdivision = _field(
         r"Subdivision:\s*(.+?)(?=\n(?:Style|Full baths|Acres|Lot Size|Garages|List date|Sold date|Off-market date|Updated|Assoc Fee|Taxes|High|Middle|Elementary):)",
@@ -250,22 +319,20 @@ def _parse_closed_detail_page(page: str, *, as_of: date) -> dict[str, Any] | Non
     )
     pool_text = _field(r"Pool Features:\s*([^\n]+)", page)
     has_pool = bool(pool_text and pool_text.lower() not in {"none", "no"})
-    address = (
-        f"{_clean(header.group('address'))}, {_clean(header.group('city'))}, "
-        f"{header.group('state')} {header.group('zip')}"
-    )
+    year_text = _labeled_value(("Year built", "Yr built"), page, r"\d{4}")
+    dom_text = _labeled_value(("Days on market", "DOM"), page, r"\d+")
     return {
-        "formattedAddress": address,
-        "mlsNumber": header.group("mls"),
+        "formattedAddress": _listing_address(page, mls_number),
+        "mlsNumber": mls_number,
         "status": "closed",
-        "soldPrice": _integer(summary.group("price")),
+        "soldPrice": sold_price,
         "soldDate": sold_date.isoformat() if sold_date else "",
         "daysOld": max(0, days_old),
-        "beds": _float(summary.group("beds")),
-        "baths": _float(summary.group("baths")),
-        "squareFootage": _integer(summary.group("sqft")),
-        "yearBuilt": _integer(summary.group("year")),
-        "daysOnMarket": _integer(summary.group("dom")),
+        "beds": _float(beds_text),
+        "baths": _float(baths_text),
+        "squareFootage": square_footage,
+        "yearBuilt": _integer(year_text),
+        "daysOnMarket": _integer(dom_text),
         "propertyType": prop_type,
         "subdivision": subdivision,
         "lotSize": _integer(_field(r"Lot Size \(sqft\):\s*([\d,]+)", page)),
@@ -291,7 +358,10 @@ def parse_cloud_cma_pages(
 
     comparables: list[dict[str, Any]] = []
     seen_mls: set[str] = set()
+    closed_page_count = 0
     for page in pages:
+        if re.search(r"\b(?:CLOSED|SOLD)\b", page, re.IGNORECASE):
+            closed_page_count += 1
         comp = _parse_closed_detail_page(page, as_of=effective_date)
         if not comp or comp["mlsNumber"] in seen_mls:
             continue
@@ -302,6 +372,11 @@ def parse_cloud_cma_pages(
         "subjectProperty": subject,
         "comparables": comparables,
         "source": "cloud_cma_armls",
+        "parseDiagnostics": {
+            "pageCount": len(pages),
+            "closedPageCount": closed_page_count,
+            "parsedClosedComparables": len(comparables),
+        },
         # Explicitly no provider-estimated value is returned or consumed.
     }
 
