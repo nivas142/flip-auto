@@ -265,13 +265,35 @@ class ZohoSecretTransferTests(unittest.TestCase):
         run.assert_not_called()
 
     def test_zoho_preflight_defaults_and_effective_inherited_window(self):
-        for env in ({}, {"ZOHO_IMAP_HOST": "imap.zoho.com", "ZOHO_FOLDER": "Off-Market-Deals"},
-                    {"EMAIL_LOOKBACK_HOURS": "48"}, {"ZOHO_LOOKBACK_HOURS": "48", "EMAIL_LOOKBACK_HOURS": "72"}):
+        for options in ({}, {"ZOHO_FOLDER": "Off-Market-Deals"},
+                        {"EMAIL_LOOKBACK_HOURS": "48"},
+                        {"ZOHO_LOOKBACK_HOURS": "48", "EMAIL_LOOKBACK_HOURS": "72"},
+                        {"ZOHO_IMAP_HOST": " imappro.zoho.com "}):
+            env = {"ZOHO_IMAP_HOST": "imappro.zoho.com", **options}
             output = io.StringIO()
             with patch.object(transfer.subprocess, "run") as run:
                 transfer.check_zoho_config(dict(env), output)
             run.assert_not_called()
             self.assertEqual(output.getvalue(), "ZOHO_HOST_MATCH=true\nZOHO_FOLDER_MATCH=true\nZOHO_LOOKBACK_MATCH=true\n")
+
+    def test_zoho_preflight_requires_the_confirmed_host_without_overriding_production_default(self):
+        for env in ({}, {"ZOHO_IMAP_HOST": ""}, {"ZOHO_IMAP_HOST": " "},
+                    {"ZOHO_IMAP_HOST": "imap.zoho.com"},
+                    {"ZOHO_IMAP_HOST": "secret-host.invalid"},
+                    {"ZOHO_IMAP_HOST": "imappro.zoho.com:993"},
+                    {"ZOHO_IMAP_HOST": "imappro.zoho.com.untrusted.invalid"}):
+            with self.subTest(env=env):
+                output = io.StringIO()
+                environ = dict(env)
+                with patch.object(transfer.subprocess, "run") as run:
+                    with self.assertRaisesRegex(transfer.TransferError, "nothing was uploaded") as caught:
+                        transfer.check_zoho_config(environ, output)
+                run.assert_not_called()
+                self.assertNotIn("ZOHO_IMAP_HOST", environ)
+                self.assertEqual(output.getvalue(), "ZOHO_HOST_MATCH=false\nZOHO_FOLDER_MATCH=true\nZOHO_LOOKBACK_MATCH=true\n")
+                for value in env.values():
+                    if value.strip():
+                        self.assertNotIn(value, output.getvalue() + str(caught.exception))
 
     def test_zoho_preflight_mismatches_reveal_no_values_and_do_no_uploads(self):
         for setting, value, flag in (
@@ -282,7 +304,7 @@ class ZohoSecretTransferTests(unittest.TestCase):
             ("ZOHO_LOOKBACK_HOURS", "private-invalid", "ZOHO_LOOKBACK_MATCH"),
         ):
             output = io.StringIO()
-            environ = {setting: value}
+            environ = {"ZOHO_IMAP_HOST": "imappro.zoho.com", setting: value}
             with patch.object(transfer.subprocess, "run") as run:
                 with self.assertRaisesRegex(transfer.TransferError, "nothing was uploaded") as caught:
                     transfer.check_zoho_config(environ, output)

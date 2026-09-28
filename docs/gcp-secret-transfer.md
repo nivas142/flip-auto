@@ -178,11 +178,18 @@ the reviewed GCP settings:
 
 | Setting | Required value |
 | --- | --- |
-| IMAP host | `imap.zoho.com` |
+| IMAP host | `imappro.zoho.com` (owner-confirmed; SSL, port 993) |
 | Folder | `Off-Market-Deals` |
 | Lookback | 48 hours |
 
-Unset host/folder settings use production defaults. If `ZOHO_LOOKBACK_HOURS` is
+The owner confirmed the incoming hostname from Zoho's account settings on
+September 28. Zoho also documents `imappro.zoho.com` for paid organization accounts
+with a custom domain: [IMAP configuration](https://www.zoho.com/mail/help/imap-access.html).
+The production and existing GCP image defaults remain `imap.zoho.com`; an unset
+production host therefore fails this account-specific check. Explicitly set the
+confirmed host on the GCP job in step 3 below. No image rebuild is needed.
+
+Unset folder settings use the production default. If `ZOHO_LOOKBACK_HOURS` is
 unset, the check inherits `EMAIL_LOOKBACK_HOURS`, then defaults to 48, matching the
 production monitor. This matters because the GCP runner defaults Zoho to 48 hours
 independently of Gmail.
@@ -226,7 +233,7 @@ start a separate execution or switch production alerts.
   gcloud run jobs update flip-auto-shadow \
     --project=flip-auto --region=us-central1 \
     --update-secrets="ZOHO_EMAIL_USERNAME=flip-auto-zoho-email-username:${ZOHO_USERNAME_SECRET_VERSION},ZOHO_EMAIL_APP_PASSWORD=flip-auto-zoho-email-app-password:${ZOHO_PASSWORD_SECRET_VERSION}" \
-    --update-env-vars="ZOHO_IMAP_HOST=imap.zoho.com,ZOHO_FOLDER=Off-Market-Deals,ZOHO_LOOKBACK_HOURS=48"
+    --update-env-vars="ZOHO_IMAP_HOST=imappro.zoho.com,ZOHO_FOLDER=Off-Market-Deals,ZOHO_LOOKBACK_HOURS=48"
 )
 ```
 

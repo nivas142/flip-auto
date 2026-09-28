@@ -143,9 +143,12 @@ def transfer_secrets(environ: MutableMapping[str, str], output: TextIO, profile=
 def check_zoho_config(environ: MutableMapping[str, str], output: TextIO) -> None:
     """Check effective production options without printing their secret values.
 
-    Production inherits Gmail's window if Zoho's setting is absent. The shadow
-    image's reviewed defaults are imap.zoho.com / Off-Market-Deals / 48 hours.
-    This preflight runs before authentication or any credential upload.
+    Production inherits Gmail's window if Zoho's setting is absent.
+    The account owner confirmed imappro.zoho.com (SSL/993) on September 28.
+    The GCP job must explicitly bind that host; the existing image default stays
+    imap.zoho.com. Preserve the production fallback below so an absent host fails
+    parity instead of silently selecting a different endpoint. Folder/window
+    remain Off-Market-Deals / 48 hours. No authentication or uploads occur here.
     """
     names = ("ZOHO_IMAP_HOST", "ZOHO_FOLDER", "ZOHO_LOOKBACK_HOURS", "EMAIL_LOOKBACK_HOURS")
     settings = {name: environ.pop(name, "").strip() for name in names}
@@ -154,14 +157,14 @@ def check_zoho_config(environ: MutableMapping[str, str], output: TextIO) -> None
     except (ValueError, TypeError):
         hours_match = False
     matches = {
-        "ZOHO_HOST_MATCH": (settings["ZOHO_IMAP_HOST"] or "imap.zoho.com") == "imap.zoho.com",
+        "ZOHO_HOST_MATCH": (settings["ZOHO_IMAP_HOST"] or "imap.zoho.com") == "imappro.zoho.com",
         "ZOHO_FOLDER_MATCH": (settings["ZOHO_FOLDER"] or "Off-Market-Deals") == "Off-Market-Deals",
         "ZOHO_LOOKBACK_MATCH": hours_match,
     }
     for name, matched in matches.items():
         print(f"{name}={str(matched).lower()}", file=output)
     if not all(matches.values()):
-        raise TransferError("Zoho configuration differs from reviewed shadow defaults; nothing was uploaded.")
+        raise TransferError("Zoho configuration differs from reviewed shadow configuration; nothing was uploaded.")
 
 
 def main() -> int:
