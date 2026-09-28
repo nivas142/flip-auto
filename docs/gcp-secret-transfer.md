@@ -1,8 +1,13 @@
 # One-time GitHub to GCP shadow-secret transfer
 
+The current GitHub workflow is **Transfer Zoho secrets to GCP**. It transfers only
+the two Zoho credentials and has one confirmation field; there is no profile
+selector. The completed core transfer remains documented below for historical
+reference. The Python helpers retain their explicit core/zoho profiles.
+
 This copies a fixed selection of credentials into existing Secret Manager containers
 in project `flip-auto` (number `941818435041`) from the existing GitHub monitor.
-The default `core` profile retains the original three-secret behavior. The explicit
+The default `core` helper profile retains the original three-secret behavior. The explicit
 `zoho` profile transfers only the two Zoho credentials using a different identity.
 It does not read secret payloads back, change GitHub or Cloudflare credentials,
 deploy a job, run the scanner, send alerts, or alter the production schedule.
@@ -23,7 +28,7 @@ Gmail; the separate Zoho procedure below extends mailbox coverage.
 **Core was completed and revoked on September 26, 2026. Do not repeat sections 1–3
 for Zoho. Go directly to “Add Zoho after the completed core transfer.”**
 
-## 1. Authorize this transfer from Cloud Shell
+## 1. Authorize this transfer from Cloud Shell (historical core setup)
 
 Use a reviewed checkout containing `deploy/gcp/setup-secret-transfer.py`. A PR
 checkout can prepare GCP trust, but the transfer workflow cannot run until the
@@ -60,15 +65,14 @@ Allow a few minutes for new IAM grants to propagate before running the workflow.
 If setup stops with an unexpected existing configuration, inspect it instead of
 removing the checks or expanding the permissions.
 
-## 2. Run once from the main branch
+## 2. Run once from the main branch (historical core setup)
 
-After merging the reviewed workflow, open GitHub Actions, select
-**Transfer shadow secrets to GCP**, choose **Run workflow** with branch **main**,
-select profile **core**, and enter `COPY-THREE-SHADOW-SECRETS` as the confirmation. Existing environment
-protection rules still apply. There are no push, schedule, or pull-request triggers.
+This historical step was completed on September 26. The former workflow used
+profile `core` with `COPY-THREE-SHADOW-SECRETS`. The current workflow no longer
+exposes that completed transfer. Do not rerun it or reactivate the core provider.
 
-The workflow pins third-party actions to commit SHAs and checks out the triggering
-commit. It provides the three secrets only to the transfer step. Payloads are sent
+The historical workflow pinned third-party actions to commit SHAs and checked out
+the triggering commit. It provided the three secrets only to the transfer step. Payloads are sent
 to `gcloud` through stdin; subprocess output is captured and errors are sanitized.
 It uploads no artifacts, prints no values/hashes/tokens, and writes no secret files.
 The authentication action removes its temporary credential file on completion.
@@ -77,7 +81,7 @@ Success logs contain only the three destination resource paths and their numeric
 versions. Save those version numbers for the Cloud Run deployment. For previously
 empty containers these should normally be version `1`, but use actual outputs.
 
-## 3. Verify metadata, then revoke transfer access
+## 3. Verify metadata, then revoke transfer access (historical core setup)
 
 In Cloud Shell, inspect version metadata only:
 
@@ -141,26 +145,33 @@ repeating the transfer.
 ```
 
 Choose one explicit UTC expiry within 48 hours and keep it unchanged on setup
-retries. The following deadline is for the September 26, 2026 setup session;
-replace it for a later session.
+retries. The following deadline is for the September 28, 2026 setup session
+(September 29 at 6 PM Arizona time). Keep it unchanged for retries within that session;
+a later session requires a fresh reviewed deadline.
 
 ```bash
 python3 deploy/gcp/setup-secret-transfer.py --profile zoho --check \
-  --expires-at '2026-09-27T08:00:00Z'
+  --expires-at '2026-09-30T01:00:00Z'
 python3 deploy/gcp/setup-secret-transfer.py --profile zoho --apply \
-  --expires-at '2026-09-27T08:00:00Z'
+  --expires-at '2026-09-30T01:00:00Z'
 ```
 
 Only `secretVersionAdder` is granted on those two containers. The runtime's
 `secretAccessor` permissions are also scoped individually to those containers.
 No existing secret versions, runtime settings, or production services change.
 
-### 2. Transfer once with the Zoho profile
+### 2. Transfer Zoho once
 
-Merge the reviewed workflow into main, then dispatch **Transfer shadow secrets to
-GCP** on **main**, select profile **zoho**, and confirm **COPY-TWO-ZOHO-SECRETS**.
-Allow new IAM grants to propagate first. The core job is skipped, and no Gmail or
-webhook secret is injected into the Zoho copy step.
+Dispatch **Transfer Zoho secrets to GCP** on **main** and enter
+**COPY-TWO-ZOHO-SECRETS** in its single confirmation field. There is no profile
+selector. Allow new IAM grants to propagate first. Incorrect confirmation fails
+with an explicit error before authentication or access to credentials; it no
+longer silently skips every job. The completed core job has been removed. No Gmail
+or webhook credential is injected into this workflow.
+
+Start a new **Run workflow** rather than rerunning an old attempt, which retains
+its original inputs and workflow revision. Dispatch once, then inspect the result
+before any retry; a successful copy creates new secret versions.
 
 Before GCP authentication, the workflow compares effective production settings to
 the reviewed GCP settings:
