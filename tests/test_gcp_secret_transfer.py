@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import importlib.util
 import io
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -308,23 +310,65 @@ class TransferWorkflowTests(unittest.TestCase):
         cls.workflow = yaml.load(
             (ROOT / ".github/workflows/transfer-gcp-secrets.yml").read_text(), Loader=yaml.BaseLoader,
         )
-        cls.job = cls.workflow["jobs"]["transfer"]
+        cls.job = cls.workflow["jobs"]["transfer_zoho"]
 
-    def test_dispatch_main_identity_and_confirmation_gate(self):
+    def test_dispatch_is_zoho_only_and_preserves_main_identity_guards(self):
         self.assertEqual(set(self.workflow["on"]), {"workflow_dispatch"})
+        self.assertEqual(set(self.workflow["jobs"]), {"transfer_zoho"})
         inputs = self.workflow["on"]["workflow_dispatch"]["inputs"]
-        self.assertEqual(set(inputs), {"confirmation", "profile"})
-        self.assertEqual(inputs["profile"]["default"], "core")
-        self.assertEqual(inputs["profile"]["options"], ["core", "zoho"])
+        self.assertEqual(set(inputs), {"confirmation"})
         self.assertEqual(inputs["confirmation"]["required"], "true")
+        self.assertEqual(inputs["confirmation"]["type"], "string")
         for guard in (
             "github.event_name == 'workflow_dispatch'", "github.ref == 'refs/heads/main'",
             "github.repository_id == '1172251948'", "github.repository_owner_id == '22221409'",
-            "inputs.confirmation == 'COPY-THREE-SHADOW-SECRETS'",
         ):
             self.assertIn(guard, self.job["if"])
+        self.assertNotIn("inputs.", self.job["if"])
         self.assertEqual(self.job["environment"], "main")
         self.assertEqual(self.workflow["permissions"], {"contents": "read", "id-token": "write"})
+        self.assertEqual(self.workflow["concurrency"], {
+            "group": "flip-auto-gcp-secret-transfer", "cancel-in-progress": "false",
+        })
+        self.assertNotIn("continue-on-error", self.job)
+
+    def test_confirmation_is_validated_before_authentication_or_secrets(self):
+        steps = self.job["steps"]
+        confirmation = steps[0]
+        self.assertEqual(confirmation["name"], "Validate Zoho transfer confirmation")
+        self.assertEqual(confirmation["shell"], "bash")
+        self.assertEqual(confirmation["env"], {"TRANSFER_CONFIRMATION": "${{ inputs.confirmation }}"})
+        self.assertNotIn("${{", confirmation["run"])
+        self.assertNotIn("if", confirmation)
+        self.assertIn("RUNNER_DEBUG", steps[1]["run"])
+        for step in steps:
+            self.assertNotIn("continue-on-error", step)
+
+    def test_confirmation_step_accepts_exact_phrase_and_rejects_input_without_executing_it(self):
+        script = self.job["steps"][0]["run"] + "\nprintf '%s\\n' 'CONFIRMATION_PASSED'\n"
+        expected_error = (
+            "::error::Enter COPY-TWO-ZOHO-SECRETS exactly in the confirmation field. Nothing was copied.\n"
+        )
+        with tempfile.TemporaryDirectory(prefix="flip-auto-confirmation-test-") as directory:
+            marker = Path(directory) / "confirmation-injected"
+            for value, valid in (
+                ("COPY-TWO-ZOHO-SECRETS", True),
+                ("", False),
+                ("COPY-THREE-SHADOW-SECRETS", False),
+                (" COPY-TWO-ZOHO-SECRETS ", False),
+                ("$(touch confirmation-injected); `touch confirmation-injected`\n"
+                 "::error::USER_INPUT_MUST_NOT_APPEAR", False),
+            ):
+                with self.subTest(value=value):
+                    result = subprocess.run(
+                        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", script],
+                        env={"PATH": os.defpath, "TRANSFER_CONFIRMATION": value},
+                        cwd=directory, capture_output=True, text=True, check=False, timeout=5,
+                    )
+                    self.assertEqual(result.returncode, 0 if valid else 1)
+                    self.assertEqual(result.stdout, "CONFIRMATION_PASSED\n" if valid else "")
+                    self.assertEqual(result.stderr, "" if valid else expected_error)
+                    self.assertFalse(marker.exists())
 
     def test_pinned_actions_fixed_wif_and_step_scoped_secrets(self):
         steps = self.job["steps"]
@@ -338,43 +382,27 @@ class TransferWorkflowTests(unittest.TestCase):
         auth = actions["google-github-actions/auth"]["with"]
         self.assertNotIn("service_account", auth)
         self.assertEqual(auth["project_id"], "flip-auto")
-        self.assertEqual(auth["workload_identity_provider"], "projects/941818435041/locations/global/workloadIdentityPools/flip-auto-secret-transfer/providers/github")
+        self.assertEqual(auth["workload_identity_provider"], "projects/941818435041/locations/global/workloadIdentityPools/flip-auto-zoho-secret-transfer/providers/github")
         self.assertEqual(auth["cleanup_credentials"], "true")
         self.assertEqual(actions["google-github-actions/setup-gcloud"]["with"]["cache"], "false")
         source_steps = [step for step in steps if "secrets." in str(step)]
-        self.assertEqual(len(source_steps), 1)
-        self.assertEqual(source_steps[0]["run"], "python3 -I deploy/gcp/transfer-secrets.py")
-        self.assertEqual(source_steps[0]["env"], {name: "${{ secrets." + name + " }}" for name in SOURCES})
+        self.assertEqual(len(source_steps), 2)
         self.assertNotIn("secrets.", str(self.job["env"]))
-        self.assertIn("RUNNER_DEBUG", steps[0]["run"])
+        for name in SOURCES:
+            self.assertNotIn("secrets." + name, str(self.workflow))
 
 
     def test_zoho_job_checks_options_before_auth_and_injects_only_selected_secrets(self):
-        job = self.workflow["jobs"]["transfer_zoho"]
-        for guard in (
-            "github.event_name == 'workflow_dispatch'", "github.ref == 'refs/heads/main'",
-            "github.repository_id == '1172251948'", "github.repository_owner_id == '22221409'",
-            "inputs.profile == 'zoho'", "inputs.confirmation == 'COPY-TWO-ZOHO-SECRETS'",
-        ):
-            self.assertIn(guard, job["if"])
-        self.assertEqual(job["environment"], "main")
-        steps = job["steps"]
+        steps = self.job["steps"]
         preflight = next(step for step in steps if step.get("run", "").endswith("--check-zoho-config"))
         auth = next(step for step in steps if step.get("uses", "").startswith("google-github-actions/auth@"))
         copy_step = next(step for step in steps if step.get("run", "").endswith("--profile zoho"))
+        self.assertLess(1, steps.index(preflight))
         self.assertLess(steps.index(preflight), steps.index(auth))
         self.assertLess(steps.index(auth), steps.index(copy_step))
         self.assertEqual(set(preflight["env"]), {"ZOHO_IMAP_HOST", "ZOHO_FOLDER", "ZOHO_LOOKBACK_HOURS", "EMAIL_LOOKBACK_HOURS"})
+        self.assertEqual(copy_step["run"], "python3 -I deploy/gcp/transfer-secrets.py --profile zoho")
         self.assertEqual(copy_step["env"], {name: "${{ secrets." + name + " }}" for name in ZohoSecretTransferTests.sources})
-        self.assertEqual(auth["with"]["workload_identity_provider"], "projects/941818435041/locations/global/workloadIdentityPools/flip-auto-zoho-secret-transfer/providers/github")
-        self.assertEqual(auth["with"]["cleanup_credentials"], "true")
-        self.assertNotIn("service_account", auth["with"])
-        for step in steps:
-            if "uses" in step:
-                self.assertRegex(step["uses"], r"@[0-9a-f]{40}$")
-        for name in SOURCES:
-            self.assertNotIn("secrets." + name, str(job))
-        self.assertIn("RUNNER_DEBUG", steps[0]["run"])
 
 
 if __name__ == "__main__":

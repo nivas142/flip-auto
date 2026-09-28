@@ -143,8 +143,10 @@ unconfirmed account. Optional Sheets: only an already-approved public CSV URL is
 supported in this phase; never make a private sheet public to accommodate it.
 
 GitHub secret values cannot be downloaded through the normal secrets API. The
-separate manual `transfer-gcp-secrets.yml` workflow copies only the three names
-above using direct Workload Identity Federation and expiring write-only grants.
+core transfer above was completed on September 26. The manual
+`transfer-gcp-secrets.yml` workflow now copies only the two Zoho credentials using
+direct Workload Identity Federation and expiring write-only grants. Its single
+confirmation field requires `COPY-TWO-ZOHO-SECRETS`; there is no profile selector.
 It uses the existing `main` GitHub environment. GCP also restricts the identity
 to the exact repository IDs, main branch, workflow path, environment and manual
 event. See the transfer instructions for setup, verification and revocation.
