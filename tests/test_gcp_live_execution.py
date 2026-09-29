@@ -27,7 +27,7 @@ def execution_fixture(v1):
                  "resources": {"limits": {"cpu": "1000m", "memory": "1Gi"}}}
     if v1:
         task = {"containers": [container], "serviceAccountName": prepare.RUNTIME_ACCOUNT,
-                "maxRetries": 0, "timeoutSeconds": 900}
+                "maxRetries": 0, "timeoutSeconds": "900"}
         return {"metadata": {"name": "flip-auto-live-ab123"}, "spec": {
             "taskCount": 1, "parallelism": 1, "template": {"spec": task}}}
     return {"name": "projects/flip-auto/locations/us-central1/jobs/flip-auto-live/executions/flip-auto-live-ab123",
@@ -78,7 +78,7 @@ class LiveExecutionConfigurationTests(unittest.TestCase):
                     specification = execution["spec"] if v1 else execution
                     if field == "timeout":
                         task = specification["template"]["spec"] if v1 else specification["template"]
-                        task["timeoutSeconds" if v1 else "timeout"] = 1800 if v1 else "1800s"
+                        task["timeoutSeconds" if v1 else "timeout"] = "1800" if v1 else "1800s"
                     else:
                         specification[field] = 2
                     with self.assertRaisesRegex(cutover.CutoverError, "configuration differs"):
