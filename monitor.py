@@ -587,7 +587,7 @@ def request_cloud_cma_for_deal(
         try:
             pdf_bytes = download_cloud_cma_pdf(pdf_url, max_bytes=max_bytes)
         except CloudCmaReportTooLarge:
-            if not shadow:
+            if not shadow and not valuation_cfg.get("retain_callback_results", False):
                 delete_result(
                     str(valuation_cfg.get("callback_base_url") or ""),
                     request_key,
@@ -621,7 +621,7 @@ def request_cloud_cma_for_deal(
         valuation = calculate_comp_valuation(payload, valuation_cfg)
         diagnostics = dict(payload.get("parseDiagnostics") or {})
         if valuation.status == "complete":
-            if not shadow:
+            if not shadow and not valuation_cfg.get("retain_callback_results", False):
                 delete_result(
                     str(valuation_cfg.get("callback_base_url") or ""),
                     request_key,
@@ -662,6 +662,9 @@ def request_cloud_cma_for_deal(
         price=deal.price,
         summary=deal.summary,
     )
+    effect_guard = valuation_cfg.get("_effect_guard")
+    if effect_guard is not None:
+        effect_guard.begin("cma_request", request_key, state)
     submission = request_quick_cma(
         api_key=str(valuation_cfg.get("api_key") or ""),
         address=deal.address,
@@ -678,10 +681,16 @@ def request_cloud_cma_for_deal(
         template=str(valuation_cfg.get("template") or "Web Leads"),
     )
     if not submission.accepted:
+        if effect_guard is not None:
+            # A status alone does not prove that the provider did not enqueue
+            # work. Keep the durable marker for reconciliation, never retry it.
+            raise RuntimeError("Cloud CMA submission was not confirmed")
         return unavailable_valuation(f"Cloud CMA request returned HTTP {submission.status_code}")
 
     requests[request_key] = datetime.now(UTC).isoformat()
     request_budget[0] -= 1
+    if effect_guard is not None:
+        effect_guard.complete(state)
     return pending_valuation("Cloud CMA report requested")
 
 
@@ -1033,10 +1042,13 @@ def scan_email_account(
     request_budget: list[int] | None = None,
     *,
     execution_mode: str = "live",
+    strict_errors: bool = False,
+    read_only_mailbox: bool = False,
 ) -> list[AlertItem]:
     if execution_mode not in {"live", "shadow"}:
         raise ValueError("Invalid execution_mode")
     shadow = execution_mode == "shadow"
+    strict = shadow or strict_errors
     host = account_cfg["imap_host"]
     username = account_cfg["username"]
     password = account_cfg["password"]
@@ -1066,28 +1078,28 @@ def scan_email_account(
     try:
         mail = imaplib.IMAP4_SSL(host)
         mail.login(username, password)
-        status, _ = mail.select(folder, readonly=True) if shadow else mail.select(folder)
+        status, _ = mail.select(folder, readonly=True) if shadow or read_only_mailbox else mail.select(folder)
         if status != "OK":
             raise RuntimeError(f"Could not select folder '{folder}' for {label}")
 
         since_date = cutoff_dt.strftime("%d-%b-%Y")
         status, msg_ids = mail.search(None, f'(SINCE "{since_date}")')
         if status != "OK":
-            if shadow:
-                raise RuntimeError("Shadow IMAP search failed")
+            if strict:
+                raise RuntimeError("IMAP search failed")
             return []
 
         for msg_id in msg_ids[0].split():
             scanned += 1
             status, header_data = mail.fetch(msg_id, "(BODY.PEEK[HEADER])")
             if status != "OK" or not header_data:
-                if shadow:
-                    raise RuntimeError("Shadow IMAP header fetch failed")
+                if strict:
+                    raise RuntimeError("IMAP header fetch failed")
                 continue
             header_raw = extract_fetch_bytes(header_data)
             if not header_raw:
-                if shadow:
-                    raise RuntimeError("Shadow IMAP header payload missing")
+                if strict:
+                    raise RuntimeError("IMAP header payload missing")
                 continue
             header_msg = message_from_bytes(header_raw)
             msg_dt = parse_email_datetime(header_msg)
@@ -1106,18 +1118,18 @@ def scan_email_account(
 
             status, data = mail.fetch(msg_id, "(BODY.PEEK[])")
             if status != "OK" or not data:
-                if shadow:
-                    raise RuntimeError("Shadow IMAP message fetch failed")
+                if strict:
+                    raise RuntimeError("IMAP message fetch failed")
                 continue
             raw = extract_fetch_bytes(data)
             if not raw:
-                if shadow:
-                    raise RuntimeError("Shadow IMAP message payload missing")
+                if strict:
+                    raise RuntimeError("IMAP message payload missing")
                 continue
             msg = message_from_bytes(raw)
 
             # Explicitly mark only configured-sender messages as read.
-            if not shadow:
+            if not shadow and not read_only_mailbox:
                 mail.store(msg_id, "+FLAGS", "\\Seen")
 
             received_at = parse_email_timestamp(msg)
@@ -1149,11 +1161,11 @@ def scan_email_account(
                             request_budget,
                         )
                     except Exception as exc:
-                        if shadow:
+                        if strict:
                             # Propagate safe diagnostics so Cloud Run cannot
                             # report success when valuation infrastructure failed.
                             raise RuntimeError(
-                                f"Shadow CMA lookup failed ({type(exc).__name__})"
+                                f"CMA lookup failed ({type(exc).__name__})"
                             ) from None
                         print(
                             "[WARN] Cloud CMA request failed "
@@ -1241,7 +1253,7 @@ def scan_email_account(
                 mail.logout()
             except Exception:
                 pass
-        log_label = "shadow-mailbox" if shadow else label
+        log_label = "shadow-mailbox" if shadow else "live-mailbox" if strict else label
         print(
             f"[INFO] Email account {log_label} ({host}): scanned {scanned} messages, "
             f"matched {matched}.",
@@ -1279,6 +1291,8 @@ def scan_emails(
                 state,
                 request_budget,
                 execution_mode=config.get("execution_mode", "live"),
+                strict_errors=bool(config.get("strict_errors", False)),
+                read_only_mailbox=bool(config.get("read_only_mailbox", False)),
             )
         )
     return results
@@ -1289,6 +1303,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     if not sheet_cfg.get("enabled", False):
         return []
     shadow = config.get("execution_mode") == "shadow"
+    strict = shadow or bool(config.get("strict_errors", False))
     screening_enabled = bool(config.get("screening", {}).get("enabled", False))
     content_columns = sheet_cfg.get("content_columns", [])
     city_column = sheet_cfg.get("city_column", "city")
@@ -1300,8 +1315,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
     try:
         public_data = load_public_sheet_rows(sheet_cfg)
     except Exception as exc:
-        if shadow:
-            raise RuntimeError(f"Shadow sheet fetch failed ({type(exc).__name__})") from None
+        if strict:
+            raise RuntimeError(f"Sheet fetch failed ({type(exc).__name__})") from None
         print(
             f"[WARN] Google Sheet public fetch failed ({exc.__class__.__name__}: {exc}). "
             "Will try service-account access if configured.",
@@ -1316,8 +1331,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
         worksheet_name = sheet_cfg.get("worksheet", "Sheet1")
 
         if not credentials_file or not spreadsheet_id:
-            if shadow:
-                raise RuntimeError("Shadow sheet access is not configured")
+            if strict:
+                raise RuntimeError("Sheet access is not configured")
             print(
                 "[WARN] Google Sheet not accessible: no public URL and missing "
                 "service-account settings. Continuing without sheet matches.",
@@ -1349,8 +1364,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
                 rows = ws.get_all_records()
             source_key = f"{spreadsheet_id}:{worksheet_name}"
         except Exception as exc:
-            if shadow:
-                raise RuntimeError(f"Shadow sheet access failed ({type(exc).__name__})") from None
+            if strict:
+                raise RuntimeError(f"Sheet access failed ({type(exc).__name__})") from None
             hint = ""
             if exc.__class__.__name__ == "SpreadsheetNotFound":
                 hint = (
@@ -1425,7 +1440,9 @@ def send_sms_alert(twilio_cfg: dict[str, Any], item: AlertItem) -> None:
     client.messages.create(**create_kwargs)
 
 
-def send_telegram_alert(telegram_cfg: dict[str, Any], item: AlertItem) -> None:
+def send_telegram_alert(
+    telegram_cfg: dict[str, Any], item: AlertItem, *, require_confirmation: bool = False,
+) -> None:
     bot_token = normalize_text(str(telegram_cfg["bot_token"]))
     chat_id = normalize_text(str(telegram_cfg["chat_id"]))
 
@@ -1447,14 +1464,31 @@ def send_telegram_alert(telegram_cfg: dict[str, Any], item: AlertItem) -> None:
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     req = Request(url=url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-    with urlopen(req, timeout=30):
-        pass
+    with urlopen(req, timeout=30) as response:
+        if require_confirmation:
+            # Do not include provider payloads/errors in logs: they can echo
+            # the bot token, mailbox content, and other private data.
+            payload = response.read(1024 * 1024 + 1)
+            if len(payload) > 1024 * 1024:
+                raise RuntimeError("Telegram confirmation exceeded the size limit")
+            result = json.loads(payload)
+            message = result.get("result") if isinstance(result, dict) else None
+            if not (
+                isinstance(result, dict) and result.get("ok") is True
+                and isinstance(message, dict)
+                and type(message.get("message_id")) is int
+                and message["message_id"] > 0
+            ):
+                raise RuntimeError("Telegram delivery was not confirmed")
 
 
 def send_alert(config: dict[str, Any], item: AlertItem) -> bool:
     telegram_cfg = config.get("telegram", {})
     if telegram_cfg.get("enabled", False):
-        send_telegram_alert(telegram_cfg, item)
+        send_telegram_alert(
+            telegram_cfg, item,
+            require_confirmation=bool(config.get("strict_errors", False)),
+        )
         return True
 
     twilio_cfg = config.get("twilio", {})
@@ -1471,16 +1505,25 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
     if mode not in {"live", "shadow"}:
         raise ValueError("Invalid execution_mode")
     shadow = mode == "shadow"
+    strict = bool(config.get("strict_errors", False))
+    effect_guard = None if shadow else config.get("_effect_guard")
+    if effect_guard is not None and not strict:
+        raise ValueError("A live effect guard requires strict_errors")
     state["last_run"] = {"mode": mode, "started_at": datetime.now(UTC).isoformat()}
     seen_order = list(dict.fromkeys(state.get("seen", [])))
     seen = set(seen_order)
+    max_seen = max(100, int(config.get("state_max_seen", 2000)))
 
     telegram_cfg = config.get("telegram", {})
     twilio_cfg = config.get("twilio", {})
     if shadow:
         print("[SHADOW] No notifications, email flag writes, new CMAs, or callback deletion.")
     elif not telegram_cfg.get("enabled", False) and not twilio_cfg.get("enabled", False):
+        if strict:
+            raise ValueError("Live production requires an enabled notifier")
         print("No notifier enabled; running in dry-run mode.")
+    if effect_guard is not None and not telegram_cfg.get("enabled", False):
+        raise ValueError("Guarded live production requires Telegram")
 
     matches: list[AlertItem] = []
     errors = 0
@@ -1488,20 +1531,26 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
         matches.extend(scan_emails(config, seen, state))
     except Exception as exc:
         errors += 1
-        error_detail = exc.__class__.__name__ if shadow else f"{exc.__class__.__name__}: {exc}"
+        error_detail = exc.__class__.__name__ if shadow or strict else f"{exc.__class__.__name__}: {exc}"
         print(
-            f"[WARN] Email scan failed ({error_detail}). Continuing.",
+            f"[WARN] Email scan failed ({error_detail}). {'Stopping.' if strict else 'Continuing.'}",
             file=sys.stderr,
         )
+        if strict:
+            state["last_run"].update(finished_at=datetime.now(UTC).isoformat(), errors=errors)
+            return 1
     try:
         matches.extend(scan_sheet(config))
     except Exception as exc:
         errors += 1
-        error_detail = exc.__class__.__name__ if shadow else f"{exc.__class__.__name__}: {exc}"
+        error_detail = exc.__class__.__name__ if shadow or strict else f"{exc.__class__.__name__}: {exc}"
         print(
-            f"[WARN] Sheet scan failed ({error_detail}). Continuing.",
+            f"[WARN] Sheet scan failed ({error_detail}). {'Stopping.' if strict else 'Continuing.'}",
             file=sys.stderr,
         )
+        if strict:
+            state["last_run"].update(finished_at=datetime.now(UTC).isoformat(), errors=errors)
+            return 1
 
     sent = 0
     suppressed = 0
@@ -1514,8 +1563,19 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
             if shadow:
                 would_alert += 1
                 print(f"[SHADOW] Would alert: {item.title}")
-            elif not send_alert(config, item):
-                print(f"[DRY RUN] {item.title}\n{item.body}\n")
+            else:
+                if effect_guard is not None:
+                    effect_guard.begin("telegram_alert", item.item_id, state)
+                try:
+                    delivered = send_alert(config, item)
+                    if strict and not delivered:
+                        raise RuntimeError("Alert delivery was not confirmed")
+                except Exception as exc:
+                    if strict:
+                        raise RuntimeError(f"Alert delivery failed ({type(exc).__name__})") from None
+                    raise
+                if not delivered:
+                    print(f"[DRY RUN] {item.title}\n{item.body}\n")
             if not shadow:
                 sent += 1
         else:
@@ -1524,9 +1584,14 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
 
         seen.add(item.item_id)
         seen_order.append(item.item_id)
+        state["seen"] = seen_order[-max_seen:]
+        if effect_guard is not None:
+            if item.notify:
+                effect_guard.complete(state)
+            else:
+                effect_guard.checkpoint(state)
 
     # Keep state bounded.
-    max_seen = max(100, int(config.get("state_max_seen", 2000)))
     state["seen"] = seen_order[-max_seen:]
     state["last_run"].update(
         finished_at=datetime.now(UTC).isoformat(), matches=len(matches),
@@ -1539,7 +1604,7 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
     )
     if shadow:
         print(f"[SHADOW] Would alert {would_alert}; scan errors {errors}.")
-    return 1 if shadow and errors else 0
+    return 1 if (shadow or strict) and errors else 0
 
 
 def main() -> int:

@@ -2,6 +2,7 @@ const RESULT_TTL_SECONDS = 7 * 24 * 60 * 60;
 const JOB_ID_RE = /^[a-f0-9]{64}$/i;
 const GITHUB_REPOSITORY_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const GITHUB_WORKFLOW_RE = /^[A-Za-z0-9_.-]+\.ya?ml$/;
+const DISPATCH_CONTROL_KEY = "control:monitor-dispatch";
 
 function responseJson(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -14,6 +15,28 @@ function authorized(request, env) {
   const expected = env.CALLBACK_SECRET || "";
   const supplied = request.headers.get("authorization") || "";
   return expected.length >= 32 && supplied === `Bearer ${expected}`;
+}
+
+function validDispatchControl(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 1 &&
+    (value.mode === "github" || value.mode === "poll")
+  );
+}
+
+async function monitorDispatchMode(env) {
+  const stored = await env.CMA_RESULTS.get(DISPATCH_CONTROL_KEY);
+  if (stored === null) {
+    return "github";
+  }
+  const control = JSON.parse(stored);
+  if (!validDispatchControl(control)) {
+    throw new Error("Invalid monitor dispatch configuration");
+  }
+  return control.mode;
 }
 
 function validPdfUrl(value) {
@@ -79,6 +102,42 @@ export default {
       return responseJson({ ok: true });
     }
 
+    if (
+      url.pathname === "/control/monitor-dispatch" &&
+      (request.method === "GET" || request.method === "PUT")
+    ) {
+      if (!authorized(request, env)) {
+        return responseJson({ error: "unauthorized" }, 401);
+      }
+      if (request.method === "PUT") {
+        let control;
+        try {
+          const contentType = request.headers.get("content-type") || "";
+          if (contentType.split(";")[0].trim().toLowerCase() !== "application/json") {
+            return responseJson({ error: "invalid dispatch configuration" }, 400);
+          }
+          control = await request.json();
+        } catch {
+          return responseJson({ error: "invalid dispatch configuration" }, 400);
+        }
+        if (!validDispatchControl(control)) {
+          return responseJson({ error: "invalid dispatch configuration" }, 400);
+        }
+        try {
+          // Persist across Worker deployments; never expire a cutover decision.
+          await env.CMA_RESULTS.put(DISPATCH_CONTROL_KEY, JSON.stringify({ mode: control.mode }));
+        } catch {
+          return responseJson({ error: "dispatch configuration unavailable" }, 503);
+        }
+        return responseJson({ mode: control.mode });
+      }
+      try {
+        return responseJson({ mode: await monitorDispatchMode(env) });
+      } catch {
+        return responseJson({ error: "dispatch configuration unavailable" }, 503);
+      }
+    }
+
     const callbackMatch = url.pathname.match(/^\/callback\/([^/]+)$/);
     if (request.method === "POST" && callbackMatch) {
       if (!env.CALLBACK_SECRET || decodeURIComponent(callbackMatch[1]) !== env.CALLBACK_SECRET) {
@@ -90,13 +149,20 @@ export default {
       if (!JOB_ID_RE.test(jobId) || !validPdfUrl(pdfUrl)) {
         return responseJson({ error: "invalid callback payload" }, 400);
       }
+      let dispatchMode;
+      try {
+        // Fail closed before storing/acknowledging a callback if control is corrupt.
+        dispatchMode = await monitorDispatchMode(env);
+      } catch {
+        return responseJson({ error: "dispatch configuration unavailable" }, 503);
+      }
       const dispatchKey = `dispatch:${jobId}`;
       await env.CMA_RESULTS.put(
         `result:${jobId}`,
         JSON.stringify({ pdf_url: pdfUrl, received_at: new Date().toISOString() }),
         { expirationTtl: RESULT_TTL_SECONDS },
       );
-      if (!(await env.CMA_RESULTS.get(dispatchKey))) {
+      if (dispatchMode === "github" && !(await env.CMA_RESULTS.get(dispatchKey))) {
         try {
           await dispatchMonitor(env);
           await env.CMA_RESULTS.put(dispatchKey, new Date().toISOString(), {
