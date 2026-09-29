@@ -50,13 +50,17 @@ RETRY_DELAYS = (1, 2, 4, 8, 16)
 
 
 class TransferProfile:
-    def __init__(self, pool, secrets, description):
+    def __init__(self, pool, secrets, description, workflow="transfer-gcp-secrets.yml"):
         self.pool = pool
         self.secrets = secrets
         self.description = description
         self.pool_resource = f"projects/{PROJECT_NUMBER}/locations/global/workloadIdentityPools/{pool}"
         self.provider_resource = f"{self.pool_resource}/providers/{PROVIDER}"
         self.member = f"principalSet://iam.googleapis.com/{self.pool_resource}/attribute.repository_id/1172251948"
+        self.claims = {**CLAIMS, "workflow_ref": f"nivas142/flip-auto/.github/workflows/{workflow}@refs/heads/main"}
+        self.attribute_condition = " && ".join(
+            f"assertion.{key} == '{value}'" for key, value in self.claims.items()
+        )
 
 
 # Core stays byte-for-byte compatible with the completed original transfer.
@@ -67,6 +71,13 @@ PROFILES = {
         "flip-auto-zoho-secret-transfer",
         ("flip-auto-zoho-email-username", "flip-auto-zoho-email-app-password"),
         "One-time GitHub transfer of two Flip Auto Zoho secrets.",
+    ),
+    "production": TransferProfile(
+        "flip-auto-live-secret-transfer",
+        ("flip-auto-cloud-cma-api-key", "flip-auto-telegram-bot-token",
+         "flip-auto-telegram-chat-id", "flip-auto-live-settings"),
+        "One-time GitHub transfer of four Flip Auto production secrets.",
+        workflow="transfer-gcp-production-secrets.yml",
     ),
 }
 
@@ -174,7 +185,7 @@ class Setup:
         if (provider.get("name") != self.profile.provider_resource or provider.get("state") != "ACTIVE"
                 or provider.get("disabled", False)
                 or provider.get("attributeMapping") != MAPPING
-                or provider.get("attributeCondition") != ATTRIBUTE_CONDITION
+                or provider.get("attributeCondition") != self.profile.attribute_condition
                 or provider.get("description") != DESCRIPTION_PREFIX + expires_at
                 or oidc.get("issuerUri") != "https://token.actions.githubusercontent.com"
                 or oidc.get("allowedAudiences", []) or oidc.get("jwksJson")
@@ -248,7 +259,7 @@ class Setup:
                             f"--workload-identity-pool={self.profile.pool}", "--location=global",
                             "--issuer-uri=https://token.actions.githubusercontent.com",
                             "--attribute-mapping=" + ",".join(f"{key}={value}" for key, value in MAPPING.items()),
-                            f"--attribute-condition={ATTRIBUTE_CONDITION}",
+                            f"--attribute-condition={self.profile.attribute_condition}",
                             f"--description={DESCRIPTION_PREFIX}{expires_at}", retry_not_found=created)
             self.validate_provider(self.provider(retry_not_found=True), expires_at)
         self.validate_only_provider()

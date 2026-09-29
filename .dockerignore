@@ -9,4 +9,5 @@
 !deal_screening.py
 !valuation.py
 !gcp_runtime.py
+!gcp_live_runtime.py
 !config.example.yaml

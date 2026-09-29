@@ -19,6 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test Worker
+        run: node --test worker/test/*.test.mjs
+
       - name: Create or find KV namespace
         id: kv
         env:
