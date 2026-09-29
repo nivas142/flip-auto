@@ -108,7 +108,10 @@ def verify_job(raw, image, versions, callback_url):
                 "Live job must have one task and parallelism one")
         account = task.get("serviceAccountName" if v1 else "serviceAccount")
         require(account == RUNTIME_ACCOUNT and task.get("maxRetries") == 0, "Unexpected runtime identity/retry policy")
-        require(task.get("timeoutSeconds") == 900 if v1 else task.get("timeout") == "900s", "Unexpected task timeout")
+        # The Cloud Run v1 REST JSON schema represents this int64 field as a
+        # decimal string. V2 uses protobuf Duration syntax.
+        require(task.get("timeoutSeconds") == "900" if v1 else task.get("timeout") == "900s",
+                "Unexpected task timeout")
         allowed_task = {"containers", "maxRetries", "timeoutSeconds", "serviceAccountName"} if v1 else {
             "containers", "maxRetries", "timeout", "serviceAccount", "executionEnvironment"}
         require(not (set(task) - allowed_task), "Unexpected live task settings; no overwrite attempted")

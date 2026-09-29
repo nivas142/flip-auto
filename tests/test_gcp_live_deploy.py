@@ -25,7 +25,8 @@ def job_fixture(v1=False):
     container = {"image": IMAGE, "command": ["python"], "args": ["gcp_live_runtime.py"], "env": env,
                  "resources": {"limits": {"cpu": "1000m", "memory": "1Gi"}}}
     if v1:
-        task = {"containers": [container], "serviceAccountName": live.RUNTIME_ACCOUNT, "maxRetries": 0, "timeoutSeconds": 900}
+        task = {"containers": [container], "serviceAccountName": live.RUNTIME_ACCOUNT,
+                "maxRetries": 0, "timeoutSeconds": "900"}
         return {"metadata": {"name": live.JOB}, "spec": {"template": {"spec": {
             "taskCount": 1, "parallelism": 1, "template": {"spec": task}}}}}
     task = {"containers": [container], "serviceAccount": live.RUNTIME_ACCOUNT, "maxRetries": 0, "timeout": "900s"}
