@@ -129,7 +129,8 @@
     "54e624e24712eb5c4ad941a3657ecfdd78ca095ba0c956b881f16d8bd161d9a6",
     "59d034ea99c204dea052629205153db3a355830355d049835d806684e24c4be7",
     "eb324989575250df688aab238fa53ebd4a61d86f3e4be4f8471d29c3534c895e",
-    "b0c9bbaf42cf5cbc01744bc74782cc6076dadd7cbbac94d204761f7df111fca4"
+    "b0c9bbaf42cf5cbc01744bc74782cc6076dadd7cbbac94d204761f7df111fca4",
+    "ccd259e613e60718a551d2172a7a1535542745d792b280577b2a0d52b18845f3"
   ],
   "cma_requests": {
     "73af116ca246329957b4c8922e8522c22dc599b89bb8ccbd393d3b6e70006e05": "2026-09-16T09:10:11.350006+00:00",
@@ -330,11 +331,11 @@
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-09-29T19:58:57.483061+00:00",
-    "finished_at": "2026-09-29T19:59:14.401958+00:00",
-    "matches": 7,
+    "started_at": "2026-09-29T23:40:07.344634+00:00",
+    "finished_at": "2026-09-29T23:40:35.008324+00:00",
+    "matches": 8,
     "sent": 0,
-    "suppressed": 0,
+    "suppressed": 1,
     "would_alert": 0,
     "errors": 0
   }
