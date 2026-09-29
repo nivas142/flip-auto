@@ -176,7 +176,8 @@
     "3f038e1d70f3ee19a379dcc8e4af5c169ea96f43d8c44efb77b9963d3db47e3b": "2026-09-26T18:36:07.335849+00:00",
     "b3818712eb06bb0aa99b76a9ac2ee3f674f85373ab020d90d667dcb7fa0c60c8": "2026-09-28T21:12:58.679787+00:00",
     "7bb1ba6bfde6c36060f5592ca5af0b01fc843a3508641a19e7cb67cc2feb7fe1": "2026-09-29T01:14:45.481250+00:00",
-    "702ff0f72f13b5a8207b5fc2dae52c05dcc33d0061d0a84c72256e9f71796670": "2026-09-29T01:15:42.945635+00:00"
+    "702ff0f72f13b5a8207b5fc2dae52c05dcc33d0061d0a84c72256e9f71796670": "2026-09-29T01:15:42.945635+00:00",
+    "d370ccce39e416fd4cebebe45254ea6321dfc25791faccfe03960a672737171a": "2026-09-29T01:16:46.156709+00:00"
   },
   "cma_reports_processed": {
     "8d82061e47a708d80b0d7ff6e65987a3290249748aca3518a6939807cc1ead8b": "2026-09-22T01:51:24.092045+00:00",
@@ -282,12 +283,32 @@
       "closed_page_count": 42,
       "parsed_closed_comps": 0,
       "eligible_closed_comps": 0
+    },
+    "7bb1ba6bfde6c36060f5592ca5af0b01fc843a3508641a19e7cb67cc2feb7fe1": {
+      "timestamp": "2026-09-29T01:16:29.485594+00:00",
+      "parser_version": 3,
+      "reason": "subject square footage unavailable",
+      "subject_sqft_available": false,
+      "page_count": 85,
+      "closed_page_count": 30,
+      "parsed_closed_comps": 13,
+      "eligible_closed_comps": 0
+    },
+    "702ff0f72f13b5a8207b5fc2dae52c05dcc33d0061d0a84c72256e9f71796670": {
+      "timestamp": "2026-09-29T01:16:44.580565+00:00",
+      "parser_version": 3,
+      "reason": "subject square footage unavailable",
+      "subject_sqft_available": false,
+      "page_count": 87,
+      "closed_page_count": 29,
+      "parsed_closed_comps": 0,
+      "eligible_closed_comps": 0
     }
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-09-29T01:15:24.221658+00:00",
-    "finished_at": "2026-09-29T01:15:47.033074+00:00",
+    "started_at": "2026-09-29T01:16:22.715818+00:00",
+    "finished_at": "2026-09-29T01:16:50.990989+00:00",
     "matches": 3,
     "sent": 0,
     "suppressed": 0,
