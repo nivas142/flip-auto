@@ -188,7 +188,8 @@
     "702ff0f72f13b5a8207b5fc2dae52c05dcc33d0061d0a84c72256e9f71796670": "2026-09-29T01:15:42.945635+00:00",
     "d370ccce39e416fd4cebebe45254ea6321dfc25791faccfe03960a672737171a": "2026-09-29T01:16:46.156709+00:00",
     "0f4d5fc4e62a44a184157749acf2b22d00efa7d607c4c05954af929979521dfe": "2026-09-29T19:58:12.358473+00:00",
-    "8e0e5c0e597d9f686754ebfa59b5b40c5a1da7f8104d900fec152f0fbaba9858": "2026-09-30T19:59:18.717192+00:00"
+    "8e0e5c0e597d9f686754ebfa59b5b40c5a1da7f8104d900fec152f0fbaba9858": "2026-09-30T19:59:18.717192+00:00",
+    "5eff0b84e5ad940fe30677e83eeb2c8b70e075945389506c819d131c6eed8016": "2026-09-30T20:02:15.498058+00:00"
   },
   "cma_reports_processed": {
     "06ef1a0cc4bd87c599889542830b71de912debf11f5fb80998f76acb961cac5b": "2026-09-23T22:16:51.774746+00:00",
@@ -331,15 +332,35 @@
       "closed_page_count": 19,
       "parsed_closed_comps": 0,
       "eligible_closed_comps": 0
+    },
+    "8e0e5c0e597d9f686754ebfa59b5b40c5a1da7f8104d900fec152f0fbaba9858": {
+      "timestamp": "2026-09-30T20:02:13.244054+00:00",
+      "parser_version": 3,
+      "reason": "subject square footage unavailable",
+      "subject_sqft_available": false,
+      "page_count": 87,
+      "closed_page_count": 24,
+      "parsed_closed_comps": 0,
+      "eligible_closed_comps": 0
+    },
+    "5eff0b84e5ad940fe30677e83eeb2c8b70e075945389506c819d131c6eed8016": {
+      "timestamp": "2026-09-30T20:02:25.645239+00:00",
+      "parser_version": 3,
+      "reason": "subject square footage unavailable",
+      "subject_sqft_available": false,
+      "page_count": 86,
+      "closed_page_count": 34,
+      "parsed_closed_comps": 0,
+      "eligible_closed_comps": 0
     }
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-09-30T19:58:42.777706+00:00",
-    "finished_at": "2026-09-30T19:59:28.951655+00:00",
+    "started_at": "2026-09-30T20:01:41.493046+00:00",
+    "finished_at": "2026-09-30T20:02:26.741880+00:00",
     "matches": 11,
     "sent": 0,
-    "suppressed": 2,
+    "suppressed": 0,
     "would_alert": 0,
     "errors": 0
   }
