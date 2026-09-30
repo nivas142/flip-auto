@@ -332,11 +332,11 @@
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-09-30T05:26:15.570926+00:00",
-    "finished_at": "2026-09-30T05:26:34.789035+00:00",
+    "started_at": "2026-09-30T06:38:26.773840+00:00",
+    "finished_at": "2026-09-30T06:38:51.906647+00:00",
     "matches": 10,
     "sent": 0,
-    "suppressed": 2,
+    "suppressed": 0,
     "would_alert": 0,
     "errors": 0
   }
