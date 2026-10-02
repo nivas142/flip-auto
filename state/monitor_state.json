@@ -205,7 +205,8 @@
     "2597bf1b731f670dba135d728221dbb5ce0c4de5b96374cae272791145741bf4": "2026-10-01T05:55:03.034447+00:00",
     "a58c093b6b875e1657568a48416be4b2b8f1672bb6633d5a0dafd6e542354a10": "2026-10-02T00:11:19.195675+00:00",
     "d126b9652839bdf78df9b41f4282cc78124fda953a9a232ecf9b2f4a0f5d024d": "2026-10-02T00:12:39.988336+00:00",
-    "0a5c0fd33313029a4604a4c1c51415814832240c84b2057619b7a805c7872022": "2026-10-02T00:14:01.265153+00:00"
+    "0a5c0fd33313029a4604a4c1c51415814832240c84b2057619b7a805c7872022": "2026-10-02T00:14:01.265153+00:00",
+    "9e4dbf904c951719f48b0a0d9b924e2f228236d09e54590498a1cd154af4e7c1": "2026-10-02T00:15:02.418757+00:00"
   },
   "cma_reports_processed": {
     "50fede95083de6ac76b0877de67655aa22945ff5f0b85942dd62545737be07bb": "2026-09-25T00:48:28.880634+00:00",
@@ -483,12 +484,22 @@
       "closed_page_count": 36,
       "parsed_closed_comps": 15,
       "eligible_closed_comps": 0
+    },
+    "0a5c0fd33313029a4604a4c1c51415814832240c84b2057619b7a805c7872022": {
+      "timestamp": "2026-10-02T00:14:59.906195+00:00",
+      "parser_version": 3,
+      "reason": "subject square footage unavailable",
+      "subject_sqft_available": false,
+      "page_count": 86,
+      "closed_page_count": 22,
+      "parsed_closed_comps": 8,
+      "eligible_closed_comps": 0
     }
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-10-02T00:13:30.230455+00:00",
-    "finished_at": "2026-10-02T00:14:11.927245+00:00",
+    "started_at": "2026-10-02T00:14:44.181095+00:00",
+    "finished_at": "2026-10-02T00:15:16.356987+00:00",
     "matches": 6,
     "sent": 0,
     "suppressed": 0,
