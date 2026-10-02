@@ -137,7 +137,11 @@
     "cd26dbeaac130999b2e360711c8cc9072ac22ca5408132cf13819351c44e4db0",
     "444147b77928128d28fc4e72c6144b1f055d3c5c65e23f03e5d75dd46ab81c58",
     "5a3ba680b310db8e29ed58ec1d6a25c88deedeea13f11a98a500babf2a310029",
-    "18d941c7cada4ca35091e7ff1c05865401c7b408961751b1a7331ce4a7bdfaeb"
+    "18d941c7cada4ca35091e7ff1c05865401c7b408961751b1a7331ce4a7bdfaeb",
+    "7d3f794e718bb684ecb05e6eefeb4b95dd93112485ad2468e0c6a1a09c470bf4",
+    "40dd5579134b19b6489925b2601164bcee3ebc3242e22255b9e22b80946bcaa0",
+    "b9fe8806bf111061ea7c2a5462091dfd95d961e9f678c0de0326260ce9aed21f",
+    "9af5ed9e96c6b28716f72a2ad85419f6d30cc09b6319a3cb975627361435eac1"
   ],
   "cma_requests": {
     "73af116ca246329957b4c8922e8522c22dc599b89bb8ccbd393d3b6e70006e05": "2026-09-16T09:10:11.350006+00:00",
@@ -504,11 +508,11 @@
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-10-02T06:57:50.666889+00:00",
-    "finished_at": "2026-10-02T06:58:09.055096+00:00",
-    "matches": 6,
+    "started_at": "2026-10-02T19:55:36.207210+00:00",
+    "finished_at": "2026-10-02T19:56:03.808205+00:00",
+    "matches": 7,
     "sent": 0,
-    "suppressed": 0,
+    "suppressed": 4,
     "would_alert": 0,
     "errors": 0
   }
