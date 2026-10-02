@@ -494,12 +494,22 @@
       "closed_page_count": 22,
       "parsed_closed_comps": 8,
       "eligible_closed_comps": 0
+    },
+    "9e4dbf904c951719f48b0a0d9b924e2f228236d09e54590498a1cd154af4e7c1": {
+      "timestamp": "2026-10-02T00:16:13.237934+00:00",
+      "parser_version": 3,
+      "reason": "subject square footage unavailable",
+      "subject_sqft_available": false,
+      "page_count": 86,
+      "closed_page_count": 26,
+      "parsed_closed_comps": 0,
+      "eligible_closed_comps": 0
     }
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-10-02T00:14:44.181095+00:00",
-    "finished_at": "2026-10-02T00:15:16.356987+00:00",
+    "started_at": "2026-10-02T00:15:50.115690+00:00",
+    "finished_at": "2026-10-02T00:16:23.752504+00:00",
     "matches": 6,
     "sent": 0,
     "suppressed": 0,
