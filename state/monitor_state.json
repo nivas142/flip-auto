@@ -575,9 +575,9 @@
   },
   "last_run": {
     "mode": "live",
-    "started_at": "2026-10-03T18:39:49.169658+00:00",
-    "finished_at": "2026-10-03T18:40:15.331906+00:00",
-    "matches": 6,
+    "started_at": "2026-10-03T22:06:31.212800+00:00",
+    "finished_at": "2026-10-03T22:06:45.759096+00:00",
+    "matches": 5,
     "sent": 0,
     "suppressed": 0,
     "would_alert": 0,
