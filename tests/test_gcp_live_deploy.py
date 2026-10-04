@@ -150,6 +150,10 @@ class LiveDeploymentTests(unittest.TestCase):
         grant = prefixes.index(("run", "jobs", "add-iam-policy-binding"))
         self.assertLess(pause, verify)
         self.assertLess(verify, grant)
+        self.assertEqual(cloud.calls[grant], (
+            "run", "jobs", "add-iam-policy-binding", live.JOB, f"--region={live.REGION}",
+            f"--member=serviceAccount:{live.SCHEDULER_ACCOUNT}", "--role=roles/run.invoker",
+        ))
         self.assertFalse(any("execute" in c or "resume" in c or "access" in c for c in cloud.calls))
         create = next(c for c in cloud.calls if c[:3] == ("run", "jobs", "create"))
         self.assertIn("--max-retries=0", create)
