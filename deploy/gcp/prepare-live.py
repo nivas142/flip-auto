@@ -348,7 +348,7 @@ class Preparation:
         verify_scheduler(self.cloud.run("scheduler", "jobs", "describe", JOB, f"--location={REGION}"))
         if not granted:
             self.cloud.run("run", "jobs", "add-iam-policy-binding", JOB, f"--region={REGION}",
-                           f"--member=serviceAccount:{SCHEDULER_ACCOUNT}", "--role=roles/run.invoker", "--condition=None")
+                           f"--member=serviceAccount:{SCHEDULER_ACCOUNT}", "--role=roles/run.invoker")
         require(self.verify_invoker_policy(self.cloud.run("run", "jobs", "get-iam-policy", JOB, f"--region={REGION}")),
                 "Invocation permission readback failed")
         print("Live job and PAUSED scheduler verified. No execution or schedule activation requested.")
