@@ -200,6 +200,73 @@ Pool Features: None
             "754 S SORRELL Lane, Gilbert, AZ 85296",
         )
 
+    def test_fully_compact_headline_and_subject_with_missing_beds_and_baths(self):
+        map_page = """Map of Comparable Listings
+STATUS: S =CLOSED P =PENDING A =ACTIVE
+MLS # STATUS ADDRESS BEDS BATHS SQFT PRICE
+1 Subject 851 E Example Drive - - 3,729 -
+2 7042790 S 11642 E Example Court 5 3.00 3,616 $946,420
+"""
+        compact_detail_page = """11642 E Example CourtChandler, AZ 85249 MLS #7042790
+$946,420 5Beds3.00Baths 3,616Sq. Ft.($262 / sqft)
+CLOSED 7/31/26 Year Built2006 Days on market:45
+Details
+Prop Type:Single Family Residence
+County:Maricopa
+Subdivision:EXAMPLE ESTATES
+Full baths:3.0
+Lot Size (sqft):25,481
+Garages:3
+List date:6/15/26
+Sold date:7/31/26
+List Price:$998,000
+Orig list price:$998,000
+Investment Pre-Screen CMA 851 E Example Drive, Chandler, AZ 85249
+"""
+
+        payload = parse_cloud_cma_pages(
+            [map_page, compact_detail_page],
+            requested_address="851 E Example Drive, Chandler, AZ 85249",
+            as_of=date(2026, 10, 5),
+        )
+
+        subject = payload["subjectProperty"]
+        self.assertEqual(subject["squareFootage"], 3_729)
+        self.assertNotIn("beds", subject)
+        self.assertNotIn("baths", subject)
+        self.assertEqual(len(payload["comparables"]), 1)
+        comp = payload["comparables"][0]
+        self.assertEqual(comp["mlsNumber"], "7042790")
+        self.assertEqual(comp["soldPrice"], 946_420)
+        self.assertEqual(comp["beds"], 5)
+        self.assertEqual(comp["baths"], 3)
+        self.assertEqual(comp["squareFootage"], 3_616)
+        self.assertEqual(comp["soldDate"], "2026-07-31")
+        self.assertEqual(
+            comp["formattedAddress"],
+            "11642 E Example Court, Chandler, AZ 85249",
+        )
+
+    def test_compact_header_preserves_direction_after_street_suffix(self):
+        page = detail_page(
+            mls="7042790",
+            address="11733 E STARFLOWER Drive E",
+            price=946_420,
+            sqft=3_616,
+            sold="7/31/26",
+        ).replace("Drive E Gilbert", "Drive EChandler").replace("85296", "85249")
+
+        payload = parse_cloud_cma_pages(
+            [page],
+            requested_address="851 E Example Drive, Chandler, AZ 85249",
+            as_of=date(2026, 10, 5),
+        )
+
+        self.assertEqual(
+            payload["comparables"][0]["formattedAddress"],
+            "11733 E STARFLOWER Drive E, Chandler, AZ 85249",
+        )
+
     def test_attached_numeric_labels_preserve_closed_price_provenance(self):
         page = """754 S SORRELL LaneGilbert, AZ 85296
 MLS7051111

@@ -481,15 +481,37 @@ def stable_id(parts: list[str]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
-def cma_address_hash(address: str) -> str:
+def cma_address_hash(address: str, *, parser_version: int | None = None) -> str:
     """Hash addresses and parser generation before persisting request state."""
+    version = CLOUD_CMA_PARSER_VERSION if parser_version is None else int(parser_version)
     return stable_id(
         [
             "cloud-cma",
-            f"parser-v{CLOUD_CMA_PARSER_VERSION}",
+            f"parser-v{version}",
             normalize_address_key(address),
         ]
     )
+
+
+def _retained_cma_callback(
+    address: str,
+    requests: dict[str, Any],
+    unavailable_reports: dict[str, Any],
+) -> tuple[str, str] | None:
+    """Find a retained report from an older parser without storing an address."""
+    for version in range(CLOUD_CMA_PARSER_VERSION - 1, 0, -1):
+        tracking_key = cma_address_hash(address, parser_version=version)
+        record = unavailable_reports.get(tracking_key)
+        if (
+            tracking_key not in requests
+            or not isinstance(record, dict)
+            or int(record.get("parser_version", 0)) != version
+        ):
+            continue
+        callback_key = str(record.get("callback_request_key") or tracking_key)
+        if re.fullmatch(r"[0-9a-f]{64}", callback_key):
+            return tracking_key, callback_key
+    return None
 
 
 def _parse_state_timestamp(value: str) -> datetime | None:
@@ -573,14 +595,27 @@ def request_cloud_cma_for_deal(
         )
     if request_key in state.setdefault("cma_reports_rejected", {}):
         return unavailable_valuation("Cloud CMA report exceeded the safe download limit")
-    if request_key in requests:
+    callback_tracking_key = request_key
+    callback_request_key = request_key
+    if request_key not in requests:
+        retained = _retained_cma_callback(deal.address, requests, unavailable_reports)
+        if retained:
+            callback_tracking_key, callback_request_key = retained
+    if callback_tracking_key in requests:
         pdf_url = fetch_result(
             str(valuation_cfg.get("callback_base_url") or ""),
-            request_key,
+            callback_request_key,
             str(valuation_cfg.get("callback_secret") or ""),
         )
         if not pdf_url:
             return pending_valuation("Cloud CMA report already requested")
+
+        def adopt_retained_report() -> None:
+            if callback_tracking_key == request_key:
+                return
+            requests[request_key] = requests[callback_tracking_key]
+            requests.pop(callback_tracking_key, None)
+            unavailable_reports.pop(callback_tracking_key, None)
 
         max_report_mb = max(1, int(valuation_cfg.get("max_report_mb", 200)))
         max_bytes = max_report_mb * 1024 * 1024
@@ -590,9 +625,10 @@ def request_cloud_cma_for_deal(
             if not shadow and not valuation_cfg.get("retain_callback_results", False):
                 delete_result(
                     str(valuation_cfg.get("callback_base_url") or ""),
-                    request_key,
+                    callback_request_key,
                     str(valuation_cfg.get("callback_secret") or ""),
                 )
+            adopt_retained_report()
             state.setdefault("cma_reports_rejected", {})[request_key] = datetime.now(UTC).isoformat()
             return unavailable_valuation(
                 f"Cloud CMA report exceeded the {max_report_mb} MB safe download limit"
@@ -624,12 +660,14 @@ def request_cloud_cma_for_deal(
             if not shadow and not valuation_cfg.get("retain_callback_results", False):
                 delete_result(
                     str(valuation_cfg.get("callback_base_url") or ""),
-                    request_key,
+                    callback_request_key,
                     str(valuation_cfg.get("callback_secret") or ""),
                 )
+            adopt_retained_report()
             state.setdefault("cma_reports_processed", {})[request_key] = datetime.now(UTC).isoformat()
             unavailable_reports.pop(request_key, None)
         else:
+            adopt_retained_report()
             unavailable_reports[request_key] = {
                 "timestamp": datetime.now(UTC).isoformat(),
                 "parser_version": CLOUD_CMA_PARSER_VERSION,
@@ -640,6 +678,8 @@ def request_cloud_cma_for_deal(
                 "parsed_closed_comps": int(diagnostics.get("parsedClosedComparables", 0)),
                 "eligible_closed_comps": len(valuation.comparables),
             }
+            if callback_request_key != request_key:
+                unavailable_reports[request_key]["callback_request_key"] = callback_request_key
             print(
                 "[WARN] Cloud CMA valuation unavailable "
                 f"(request={request_key[:12]}, reason={valuation.reason or 'unknown'}, "

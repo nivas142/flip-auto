@@ -224,6 +224,11 @@ class LiveStateTests(unittest.TestCase):
             "a" * 64: {"timestamp": self.now.isoformat(), "reason": "No comps", "parser_version": 2},
         }}
         self.assertEqual(validate_import_state(valid), valid)
+        valid["cma_reports_unavailable"]["a" * 64]["callback_request_key"] = "b" * 64
+        self.assertEqual(validate_import_state(valid), valid)
+        valid["cma_reports_unavailable"]["a" * 64]["callback_request_key"] = "raw-address"
+        with self.assertRaises(RuntimeConfigurationError):
+            validate_import_state(valid)
         self.assertNotIn("finished_at", validate_import_state(production_state())["last_run"])
 
     def test_acquire_preserves_import_and_blocks_overlapping_execution(self):

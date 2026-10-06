@@ -253,6 +253,11 @@ def validate_import_state(state: dict[str, Any]) -> dict[str, Any]:
                     type(record["parser_version"]) is not int or record["parser_version"] < 1
                 ):
                     raise RuntimeConfigurationError("Malformed unavailable CMA parser version")
+                if "callback_request_key" in record and (
+                    not isinstance(record["callback_request_key"], str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", record["callback_request_key"])
+                ):
+                    raise RuntimeConfigurationError("Malformed unavailable CMA callback key")
             try:
                 parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if isinstance(timestamp, str) else None
             except ValueError:
