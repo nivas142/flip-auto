@@ -38,7 +38,11 @@ def job(image=rollout.BASE_IMAGE):
 
 def replay_result():
     return {"baseline_verified": True, "module_profile": "current-parser",
-            "result_sha256": rollout.RESULT_SHA, "module_sha256": {"cloud_cma": rollout.PARSER_SHA},
+            "result_sha256": rollout.RESULT_SHA,
+            "module_sha256": {
+                "cloud_cma": rollout.PARSER_SHA,
+                "monitor": rollout.MONITOR_SHA,
+            },
             "side_effects": {"alerts_sent": 0, "cma_requests": 0, "persistent_state_writes": 0}}
 
 
@@ -78,9 +82,11 @@ class ParserRolloutTests(unittest.TestCase):
     def test_baked_parser_is_replayed_before_only_shadow_image_changes(self):
         commands = FakeCommands()
         self.assertEqual(rollout.apply(ROOT, commands, io.StringIO()), NEW_IMAGE)
-        self.assertEqual(commands.build_files, ["Dockerfile", "cloud_cma.py"])
+        self.assertEqual(commands.build_files, ["Dockerfile", "cloud_cma.py", "monitor.py"])
         self.assertEqual(commands.build_dockerfile,
-                         f"FROM {rollout.BASE_IMAGE}\nCOPY --chown=10001:10001 cloud_cma.py /app/cloud_cma.py\n")
+                         f"FROM {rollout.BASE_IMAGE}\n"
+                         "COPY --chown=10001:10001 cloud_cma.py /app/cloud_cma.py\n"
+                         "COPY --chown=10001:10001 monitor.py /app/monitor.py\n")
         self.assertIn("--platform=linux/amd64", next(call for call in commands.calls if call[:2] == ("docker", "build")))
         run = next(call for call in commands.calls if call[:2] == ("docker", "run"))
         self.assertEqual(run.count("--mount"), 1)
@@ -150,6 +156,7 @@ class ParserRolloutTests(unittest.TestCase):
             root = Path(directory)
             (root / "scripts").mkdir()
             (root / "cloud_cma.py").write_text("unreviewed parser")
+            (root / "monitor.py").write_text("unreviewed monitor")
             (root / "scripts/gcp_cma_replay.py").write_text("unreviewed replay")
             with self.assertRaisesRegex(rollout.RolloutError, "missing or changed"):
                 rollout.reviewed_files(root)

@@ -21,9 +21,10 @@ REGION = "us-central1"
 JOB = "flip-auto-shadow"
 SERVICE_ACCOUNT = "flip-auto-shadow@flip-auto.iam.gserviceaccount.com"
 REPOSITORY = "us-central1-docker.pkg.dev/flip-auto/flip-auto/monitor"
-BASE_IMAGE = REPOSITORY + "@sha256:90854306a03c5856b9b7b7bac550b399db4e6b8fcdd9d9843a7d4cafadd4fce3"
-PARSER_SHA = "c8d05718135ed6656830ae2b91c6a07ef4e4cebc357cab3f02cc424cc3886e65"
-REPLAY_SHA = "c8ec40b0412b369a2e43d55bab76f921cc10bb605997aa472d07561a6fb29b63"
+BASE_IMAGE = REPOSITORY + "@sha256:2b7774bfaf7d99d9fa4e15798a0c40ff2d2b533849db99b2aa33e5779b0285b6"
+PARSER_SHA = "d262aae235126c60ede4599936fbb74fdbf7f9dddc884ba2054b05a646167415"
+MONITOR_SHA = "e01a0c204830b1d561e72918aef5774a307e4a3543ac647f9274d35c583f6f9f"
+REPLAY_SHA = "5cbdf589e4b43b70199ee092da0d8b921c19d150fb23d5e0160e170af63efc38"
 RESULT_SHA = "7907073ef91c53d371fd5bf0a29b9932ec3829c6598ef2fb5211b98638b2ad7e"
 
 
@@ -61,8 +62,8 @@ class Commands:
 
 def reviewed_files(root=None):
     root = root or Path(__file__).resolve().parents[2]
-    paths = (root / "cloud_cma.py", root / "scripts/gcp_cma_replay.py")
-    for path, expected in zip(paths, (PARSER_SHA, REPLAY_SHA)):
+    paths = (root / "cloud_cma.py", root / "monitor.py", root / "scripts/gcp_cma_replay.py")
+    for path, expected in zip(paths, (PARSER_SHA, MONITOR_SHA, REPLAY_SHA)):
         if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             raise RolloutError("Reviewed parser or replay source is missing or changed")
     return paths
@@ -112,6 +113,7 @@ def verify_replay(output):
         if (result.get("baseline_verified") is not True or result.get("module_profile") != "current-parser"
                 or result.get("result_sha256") != RESULT_SHA
                 or result.get("module_sha256", {}).get("cloud_cma") != PARSER_SHA
+                or result.get("module_sha256", {}).get("monitor") != MONITOR_SHA
                 or result.get("side_effects") != {"alerts_sent": 0, "cma_requests": 0, "persistent_state_writes": 0}):
             raise ValueError("baseline mismatch")
     except (ValueError, TypeError, AttributeError) as exc:
@@ -120,7 +122,7 @@ def verify_replay(output):
 
 
 def apply(root=None, commands=None, output=None):
-    parser, replay = reviewed_files(root)
+    parser, monitor, replay = reviewed_files(root)
     commands, output = commands or Commands(), output or sys.stdout
     project = commands.gcloud("projects", "describe", PROJECT)
     if (project.get("projectId") != PROJECT or str(project.get("projectNumber")) != PROJECT_NUMBER
@@ -128,13 +130,17 @@ def apply(root=None, commands=None, output=None):
         raise RolloutError("Expected active project flip-auto (941818435041)")
     describe = ("run", "jobs", "describe", JOB, f"--region={REGION}")
     original = job_configuration(commands.gcloud(*describe), BASE_IMAGE)
-    tag = REPOSITORY + ":parser-v3-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex[:8]
+    tag = REPOSITORY + ":parser-v4-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex[:8]
     with tempfile.TemporaryDirectory(prefix="flip-auto-parser-rollout-") as directory:
         context = Path(directory)
         shutil.copyfile(parser, context / "cloud_cma.py")
+        shutil.copyfile(monitor, context / "monitor.py")
         (context / "cloud_cma.py").chmod(0o644)
+        (context / "monitor.py").chmod(0o644)
         (context / "Dockerfile").write_text(
-            f"FROM {BASE_IMAGE}\nCOPY --chown=10001:10001 cloud_cma.py /app/cloud_cma.py\n")
+            f"FROM {BASE_IMAGE}\n"
+            "COPY --chown=10001:10001 cloud_cma.py /app/cloud_cma.py\n"
+            "COPY --chown=10001:10001 monitor.py /app/monitor.py\n")
         print("Building parser-only image from the reviewed base; dependencies are unchanged.", file=output, flush=True)
         commands.run("docker", "build", "--platform=linux/amd64", "--tag", tag, str(context), timeout=600)
         replay_mount = f"type=bind,src={replay.resolve()},dst=/app/gcp_cma_replay.py,readonly"

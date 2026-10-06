@@ -27,7 +27,7 @@ META_REFRESH_RE = re.compile(
 )
 DEFAULT_MAX_REPORT_BYTES = 200 * 1024 * 1024
 MAX_WRAPPER_BYTES = 2 * 1024 * 1024
-CLOUD_CMA_PARSER_VERSION = 3
+CLOUD_CMA_PARSER_VERSION = 4
 
 
 class CloudCmaReportTooLarge(ValueError):
@@ -205,14 +205,26 @@ def _labeled_value(labels: tuple[str, ...], text: str, value_pattern: str) -> st
 
 def _listing_address(page: str, mls_number: str) -> str:
     """Best-effort display address; valuation never depends on this field."""
+    # Detail pages repeat the subject address in their footer. Restrict address
+    # discovery to the listing header ending at this record's MLS number so a
+    # compact header cannot fall through and accidentally select that footer.
+    header_match = re.match(
+        rf"(?P<header>[\s\S]{{0,240}}?)\bMLS\s*(?:#|No\.?)?\s*:?\s*"
+        rf"{re.escape(mls_number)}\b",
+        page,
+        flags=re.IGNORECASE,
+    )
+    if not header_match:
+        return f"MLS #{mls_number}"
+    header = header_match.group("header")
     match = re.search(
         r"(?P<address>\d{1,6}\s+.{2,100}?\b(?:"
         r"Street|St|Road|Rd|Drive|Dr|Lane|Ln|Avenue|Ave|Court|Ct|Way|Place|Pl|"
         r"Boulevard|Blvd|Trail|Trl|Circle|Cir|Parkway|Pkwy"
         r")\b(?:\s+(?:#|Unit\s+)?[A-Za-z0-9-]+)?)\s*,?\s+"
-        r"(?P<city>[A-Za-z][A-Za-z .'-]{1,40})\s*,\s*"
+        r"(?P<city>(?-i:(?![NSEW][A-Z][a-z])[A-Z])[A-Za-z .'-]{1,40})\s*,\s*"
         r"(?P<state>[A-Z]{2})\s+(?P<zip>\d{5})",
-        page,
+        header,
         flags=re.IGNORECASE | re.DOTALL,
     )
     if not match:
@@ -224,9 +236,10 @@ def _listing_address(page: str, mls_number: str) -> str:
             r"(?P<address>\d{1,6}\s+[^\n]{2,100}?\b(?:"
             r"Street|Road|Drive|Lane|Avenue|Court|Way|Place|"
             r"Boulevard|Trail|Circle|Parkway"
-            r"))(?P<city>(?-i:[A-Z])[A-Za-z .'-]{1,40})\s*,\s*"
+            r")(?:\s+(?-i:[NSEW]))?)(?P<city>"
+            r"(?-i:(?![NSEW][A-Z][a-z])[A-Z])[A-Za-z .'-]{1,40})\s*,\s*"
             r"(?P<state>[A-Z]{2})\s+(?P<zip>\d{5})",
-            page,
+            header,
             flags=re.IGNORECASE,
         )
     if not match:
@@ -243,21 +256,23 @@ def _subject_from_pages(pages: list[str], requested_address: str) -> dict[str, A
         if not re.search(r"Map\s+of\s+Comparable\s+Listings", page, re.IGNORECASE):
             continue
         match = re.search(
-            r"\bSubject\s+(?P<address>.+?)\s+(?P<beds>\d+(?:\.\d+)?)\s+"
-            r"(?P<baths>\d+(?:\.\d+)?)\s+(?P<sqft>[\d,]+)\s+(?:-|N/?A)",
+            r"^\s*(?:\d+\s+)?Subject\s+(?P<address>[^\n]+?)\s+"
+            r"(?P<beds>\d+(?:\.\d+)?|-)\s+"
+            r"(?P<baths>\d+(?:\.\d+)?|-)\s+"
+            r"(?P<sqft>[\d,]+|-)\s+(?:\$?[\d,]+|-|N/?A)\s*$",
             page,
-            re.IGNORECASE | re.DOTALL,
+            re.IGNORECASE | re.MULTILINE,
         )
         if not match:
             continue
-        subject.update(
-            {
-                "reportAddress": _clean(match.group("address")),
-                "beds": _float(match.group("beds")),
-                "baths": _float(match.group("baths")),
-                "squareFootage": _integer(match.group("sqft")),
-            }
-        )
+        subject["reportAddress"] = _clean(match.group("address"))
+        for key, value in (
+            ("beds", _float(match.group("beds"))),
+            ("baths", _float(match.group("baths"))),
+            ("squareFootage", _integer(match.group("sqft"))),
+        ):
+            if value is not None:
+                subject[key] = value
         break
     return subject
 
@@ -298,9 +313,9 @@ def _parse_closed_detail_page(page: str, *, as_of: date) -> dict[str, Any] | Non
     )
     summary = re.search(
         r"\$(?P<price>[\d,]+)\s+"
-        r"(?P<beds>\d+(?:\.\d+)?)\s+Beds?\s*"
-        r"(?P<baths>\d+(?:\.\d+)?)\s+Baths?\s+"
-        r"(?P<sqft>[\d,]+)\s+(?:Sq\.?\s*Ft\.?|SQFT|SF)\b",
+        r"(?P<beds>\d+(?:\.\d+)?)\s*Beds?\s*"
+        r"(?P<baths>\d+(?:\.\d+)?)\s*Baths?\s*"
+        r"(?P<sqft>[\d,]+)\s*(?:Sq\.?\s*Ft\.?|SQFT|SF)\b",
         page,
         re.IGNORECASE | re.DOTALL,
     )

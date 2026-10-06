@@ -41,10 +41,10 @@ SCREENING_CONFIG = {
 EXPECTED_REPORT_SHA256 = "0fbe05a1ec669c6eb1548e6cc5fdf0ab4507a3e245309ae56225689677c40972"
 EXPECTED_RESULT_SHA256 = "7907073ef91c53d371fd5bf0a29b9932ec3829c6598ef2fb5211b98638b2ad7e"
 EXPECTED_MODULE_SHA256 = {
-    "cloud_cma": "c8d05718135ed6656830ae2b91c6a07ef4e4cebc357cab3f02cc424cc3886e65",
+    "cloud_cma": "d262aae235126c60ede4599936fbb74fdbf7f9dddc884ba2054b05a646167415",
     "valuation": "b8400c04f325f3c4b4296aa0d8113ea5e1fc09876cee998563053d9441a605f4",
     "deal_screening": "ceb04a8d3e68ab99ff1b267d6da94d31b4a6cac8affd675a1df8da1e970060b9",
-    "monitor": "759f7dc616c3d01aebc36cef1f4f6e8858952d5407ec6c9840df5a2ca34003ec",
+    "monitor": "e01a0c204830b1d561e72918aef5774a307e4a3543ac647f9274d35c583f6f9f",
 }
 # Keep the original deployed parser as an explicitly reviewed diagnostic
 # profile. It must satisfy the SAME result baseline; accepting its source does

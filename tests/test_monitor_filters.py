@@ -230,6 +230,66 @@ class MonitorFilterTests(unittest.TestCase):
         self.assertEqual(record["closed_page_count"], 8)
         self.assertNotIn("Main St", str(record))
 
+    def test_new_parser_reuses_retained_callback_without_new_cma_request(self):
+        deal = monitor.PropertyDeal(
+            city="Chandler",
+            address="851 E Example Dr, Chandler, AZ 85249",
+            price="$650,000",
+            details_url="",
+            image_url="",
+            summary="3,729 sqft",
+        )
+        prior_version = monitor.CLOUD_CMA_PARSER_VERSION - 1
+        prior_key = monitor.cma_address_hash(deal.address, parser_version=prior_version)
+        current_key = monitor.cma_address_hash(deal.address)
+        requested_at = datetime.now(timezone.utc).isoformat()
+        state = {
+            "cma_requests": {prior_key: requested_at},
+            "cma_reports_unavailable": {
+                prior_key: {
+                    "timestamp": requested_at,
+                    "parser_version": prior_version,
+                    "reason": "subject square footage unavailable",
+                }
+            },
+        }
+        cfg = {
+            "callback_base_url": "https://callback.example.workers.dev",
+            "callback_secret": "x" * 40,
+            "max_report_mb": 200,
+        }
+        expected = ValuationResult(
+            status="complete",
+            source="test",
+            arv_low=900_000,
+            arv_likely=1_000_000,
+            arv_high=1_100_000,
+            confidence="low",
+            subject_square_footage=3_729,
+            comparables=(),
+        )
+        with (
+            patch.object(monitor, "fetch_result", return_value="https://cloudcma.com/pdf/retained") as fetch_mock,
+            patch.object(monitor, "download_cloud_cma_pdf", return_value=b"%PDF retained"),
+            patch.object(
+                monitor,
+                "parse_cloud_cma_pdf",
+                return_value={"subjectProperty": {"squareFootage": 3_729}, "comparables": []},
+            ),
+            patch.object(monitor, "calculate_comp_valuation", return_value=expected),
+            patch.object(monitor, "request_quick_cma") as request_mock,
+            patch.object(monitor, "delete_result") as delete_mock,
+        ):
+            result = monitor.request_cloud_cma_for_deal(deal, cfg, state, [1])
+
+        self.assertEqual(result, expected)
+        fetch_mock.assert_called_once_with(cfg["callback_base_url"], prior_key, cfg["callback_secret"])
+        delete_mock.assert_called_once_with(cfg["callback_base_url"], prior_key, cfg["callback_secret"])
+        request_mock.assert_not_called()
+        self.assertEqual(state["cma_requests"], {current_key: requested_at})
+        self.assertIn(current_key, state["cma_reports_processed"])
+        self.assertEqual(state["cma_reports_unavailable"], {})
+
     def test_oversized_callback_is_deleted_and_not_downloaded_again(self):
         deal = monitor.PropertyDeal(
             city="Mesa",
