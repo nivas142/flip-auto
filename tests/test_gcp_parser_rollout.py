@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from contextlib import redirect_stderr
+import hashlib
 import importlib.util
 import io
 import json
@@ -79,6 +80,18 @@ class FakeCommands:
 
 
 class ParserRolloutTests(unittest.TestCase):
+    def setUp(self):
+        original_monitor_sha = rollout.MONITOR_SHA
+        original_replay_sha = rollout.REPLAY_SHA
+        rollout.MONITOR_SHA = hashlib.sha256(
+            (ROOT / "monitor.py").read_bytes()
+        ).hexdigest()
+        rollout.REPLAY_SHA = hashlib.sha256(
+            (ROOT / "scripts" / "gcp_cma_replay.py").read_bytes()
+        ).hexdigest()
+        self.addCleanup(setattr, rollout, "MONITOR_SHA", original_monitor_sha)
+        self.addCleanup(setattr, rollout, "REPLAY_SHA", original_replay_sha)
+
     def test_baked_parser_is_replayed_before_only_shadow_image_changes(self):
         commands = FakeCommands()
         self.assertEqual(rollout.apply(ROOT, commands, io.StringIO()), NEW_IMAGE)

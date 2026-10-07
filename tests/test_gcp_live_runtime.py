@@ -96,7 +96,7 @@ class LiveConfigTests(unittest.TestCase):
         cfg = self.config()
         self.assertEqual(cfg["execution_mode"], "live")
         self.assertTrue(cfg["strict_errors"])
-        self.assertTrue(cfg["read_only_mailbox"])
+        self.assertFalse(cfg["read_only_mailbox"])
         self.assertTrue(cfg["valuation"]["retain_callback_results"])
         self.assertEqual(cfg["valuation"]["max_requests_per_run"], 1)
         self.assertEqual(cfg["valuation"]["max_requests_per_day"], 10)

@@ -96,6 +96,51 @@ class MonitorFilterTests(unittest.TestCase):
     def test_ask_price_rejects_small_fee_as_property_price(self):
         self.assertEqual(monitor.extract_ask_price("Price: $120 processing fee"), "")
 
+    def test_plain_text_cards_keep_each_price_with_its_property(self):
+        raw_message = build_email_bytes(
+            from_addr="Dispo <dispo@sellwholesalehouses.com>",
+            subject="Current inventory",
+            body="""
+18132 W Addie Ln
+Surprise AZ 85374
+Details
+* 1,696 SQFT
+[4]Click Here For Photos
+Price: $ 285,000 (REDUCED)
+Worth: $ 475,000
+
+1427 E Jasper Dr
+Chandler AZ 85225
+Details
+* 1986 Build
+* 1,613 SQFT
+* 4 Bed
+* 2 Bath
+[7]Click Here For Photos
+Price: $ 430,000 (REDUCED)
+
+9547 E Osage Ave
+Mesa AZ 85212
+Details
+* 1999 Build
+* 2,343 SQFT
+[10]Click Here For Photos
+Price: $ 444,000 (REDUCED)
+Worth: $ 615,000
+""",
+        )
+        message = monitor.message_from_bytes(raw_message)
+
+        deals = monitor.extract_property_deals_from_email(message, ["Chandler", "Mesa"])
+
+        self.assertEqual(
+            [(deal.address, deal.price) for deal in deals],
+            [
+                ("1427 E Jasper Dr Chandler AZ 85225", "$ 430,000"),
+                ("9547 E Osage Ave Mesa AZ 85212", "$ 444,000"),
+            ],
+        )
+
     def test_cloud_cma_request_is_deduped_without_persisting_raw_address(self):
         deal = monitor.PropertyDeal(
             city="Gilbert",
@@ -590,6 +635,57 @@ class MonitorFilterTests(unittest.TestCase):
         self.assertEqual(results[0].title, "Email match: Chandler")
         self.assertIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
         self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 1.", stderr.getvalue())
+
+    def test_strict_read_flag_failure_stops_after_successful_parse(self):
+        raw_message = build_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New deal",
+            body="Mesa deal details inside.",
+        )
+        fake_imap = FakeIMAP(raw_message)
+        fake_imap.store = unittest.mock.Mock(return_value=("NO", []))
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": ["deals@example.com"],
+            "subject_filters": [],
+            "cities": ["Mesa"],
+        }
+
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), self.assertRaisesRegex(
+            RuntimeError, "IMAP read flag update failed"
+        ):
+            monitor.scan_email_account(account_cfg, strict_errors=True)
+
+    def test_parse_failure_does_not_mark_message_read(self):
+        raw_message = build_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New deal",
+            body="Mesa deal details inside.",
+        )
+        fake_imap = FakeIMAP(raw_message)
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": ["deals@example.com"],
+            "subject_filters": [],
+            "cities": ["Mesa"],
+        }
+
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
+            monitor, "detect_email_city", side_effect=ValueError("bad message")
+        ), self.assertRaisesRegex(ValueError, "bad message"):
+            monitor.scan_email_account(account_cfg, strict_errors=True)
+
+        self.assertNotIn("store", [call[0] for call in fake_imap.calls])
 
     def test_nonmatching_subject_is_ignored(self):
         raw_message = build_email_bytes(
