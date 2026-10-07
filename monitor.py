@@ -88,10 +88,10 @@ class PropertyDeal:
 
 
 ADDRESS_RE = re.compile(
-    r"\b\d{1,6}\s+[^,\n]+,\s*[A-Za-z .#'-]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b"
+    r"(?<![$,\d])\b\d{1,6}\s+[^,\n]+,\s*[A-Za-z .#'-]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b"
 )
 ADDRESS_FLEX_RE = re.compile(
-    r"\b\d{1,6}\s+[A-Za-z0-9 .#'/-]{2,100}?(?:,\s*|\s+)[A-Za-z .'-]{2,40}(?:,\s*|\s+)[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b"
+    r"(?<![$,\d])\b\d{1,6}\s+[A-Za-z0-9 .#'/-]{2,100}?(?:,\s*|\s+)[A-Za-z .'-]{2,40}(?:,\s*|\s+)[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b"
 )
 ASK_PRICE_LABELS = (
     "all-in price",
@@ -365,23 +365,34 @@ def extract_property_deals_from_plain_text(msg: Message, cities: list[str]) -> l
     deals: list[PropertyDeal] = []
     seen_addresses: set[str] = set()
 
-    for price_match in PLAIN_PRICE_RE.finditer(plain_text):
-        price = normalize_text(price_match.group("amount"))
-        if not _is_plausible_ask_amount(
-            price, plain_text[price_match.end() : price_match.end() + 30]
-        ):
-            continue
-        window_start = max(0, price_match.start() - 700)
-        window_end = min(len(plain_text), price_match.end() + 700)
-        window = plain_text[window_start:window_end]
-
-        address_matches = list(ADDRESS_FLEX_RE.finditer(window))
-        if not address_matches:
-            continue
-        address = normalize_text(address_matches[-1].group(0))
+    # Treat each address as the start of its own card. Some multi-property
+    # emails put the price at the end of the card, immediately before the next
+    # address. Searching around a price can therefore attach it to the next
+    # property. Address-bounded blocks prevent values crossing card borders.
+    address_matches = list(ADDRESS_FLEX_RE.finditer(plain_text))
+    for index, address_match in enumerate(address_matches):
+        address = normalize_text(address_match.group(0))
 
         city = configured_city_from_address(address, cities)
         if not city:
+            continue
+
+        block_end = (
+            address_matches[index + 1].start()
+            if index + 1 < len(address_matches)
+            else len(plain_text)
+        )
+        block = plain_text[address_match.start() : block_end]
+        price = ""
+        price_match = None
+        for candidate in PLAIN_PRICE_RE.finditer(block):
+            amount = normalize_text(candidate.group("amount"))
+            trailing = block[candidate.end() : candidate.end() + 30]
+            if _is_plausible_ask_amount(amount, trailing):
+                price = amount
+                price_match = candidate
+                break
+        if not price or price_match is None:
             continue
 
         key = address.lower()
@@ -389,11 +400,11 @@ def extract_property_deals_from_plain_text(msg: Message, cities: list[str]) -> l
             continue
         seen_addresses.add(key)
 
-        after_price = window[price_match.end() - window_start :]
+        after_price = block[price_match.end() :]
         detail_link_match = URL_RE.search(after_price)
         details_url = normalize_text(detail_link_match.group(0)) if detail_link_match else ""
 
-        summary = normalize_text(window.replace(address, "", 1))[:260]
+        summary = normalize_text(block.replace(address_match.group(0), "", 1))[:260]
         deals.append(
             PropertyDeal(
                 city=city,
@@ -406,6 +417,30 @@ def extract_property_deals_from_plain_text(msg: Message, cities: list[str]) -> l
         )
 
     return deals
+
+
+def _deal_container_for_link(link: Any, cities: list[str]) -> tuple[Any, str, str] | None:
+    """Return the smallest HTML ancestor containing one complete deal card."""
+    for parent in link.parents:
+        if getattr(parent, "name", None) in {"html", "body"}:
+            break
+        card_text = normalize_text(parent.get_text(" ", strip=True))
+        if not card_text:
+            continue
+        matches = list(ADDRESS_RE.finditer(card_text)) or list(ADDRESS_FLEX_RE.finditer(card_text))
+        approved = [
+            (match, configured_city_from_address(normalize_text(match.group(0)), cities))
+            for match in matches
+        ]
+        approved = [(match, city) for match, city in approved if city]
+        if len(approved) != 1:
+            continue
+        price = extract_ask_price(card_text)
+        if not price:
+            continue
+        address_match, city = approved[0]
+        return parent, normalize_text(address_match.group(0)), str(city)
+    return None
 
 
 def extract_property_deals_from_email(msg: Message, cities: list[str]) -> list[PropertyDeal]:
@@ -424,25 +459,16 @@ def extract_property_deals_from_email(msg: Message, cities: list[str]) -> list[P
             ("photos" in link_text and "detail" in link_text)
             or ("pictures" in link_text and "video" in link_text)
             or "click here to view" in link_text
+            or "click here for photos" in link_text
         )
         if not is_deal_link:
             continue
 
-        card_td = link.find_parent("td")
-        if card_td is None:
+        container_result = _deal_container_for_link(link, cities)
+        if container_result is None:
             continue
-        card_text = normalize_text(card_td.get_text(" ", strip=True))
-        if not card_text:
-            continue
-
-        address_match = ADDRESS_RE.search(card_text) or ADDRESS_FLEX_RE.search(card_text)
-        if not address_match:
-            continue
-
-        address = normalize_text(address_match.group(0))
-        city = configured_city_from_address(address, cities)
-        if not city:
-            continue
+        card_container, address, city = container_result
+        card_text = normalize_text(card_container.get_text(" ", strip=True))
 
         key = address.lower()
         if key in seen_addresses:
@@ -453,11 +479,9 @@ def extract_property_deals_from_email(msg: Message, cities: list[str]) -> list[P
         details_url = normalize_text(str(link.get("href", "")))
 
         image_url = ""
-        card_row = card_td.find_parent("tr")
-        if card_row is not None:
-            img = card_row.find("img", src=True)
-            if img is not None:
-                image_url = normalize_text(str(img.get("src", "")))
+        img = card_container.find("img", src=True)
+        if img is not None:
+            image_url = normalize_text(str(img.get("src", "")))
 
         summary = normalize_text(card_text.replace(address, "", 1).replace("Photos / Details", ""))
         deals.append(
@@ -1073,6 +1097,16 @@ def deal_item_id(deal: PropertyDeal) -> str:
     return stable_id(["deal", normalize_address_key(deal.address), normalized_ask])
 
 
+def mark_email_seen(mail: Any, msg_id: bytes, *, strict: bool) -> None:
+    """Mark a successfully parsed message read; make live failures visible."""
+    status, _ = mail.store(msg_id, "+FLAGS", "\\Seen")
+    if status == "OK":
+        return
+    if strict:
+        raise RuntimeError("IMAP read flag update failed")
+    print("[WARN] IMAP read flag update failed.", file=sys.stderr)
+
+
 def scan_email_account(
     account_cfg: dict[str, Any],
     screening_cfg: dict[str, Any] | None = None,
@@ -1168,14 +1202,12 @@ def scan_email_account(
                 continue
             msg = message_from_bytes(raw)
 
-            # Explicitly mark only configured-sender messages as read.
-            if not shadow and not read_only_mailbox:
-                mail.store(msg_id, "+FLAGS", "\\Seen")
-
             received_at = parse_email_timestamp(msg)
             body = parse_email_body(msg)
             city, parsed_deals = detect_email_city(msg, from_header, subject, body, cities)
             if not city:
+                if not shadow and not read_only_mailbox:
+                    mark_email_seen(mail, msg_id, strict=strict)
                 continue
 
             matched += 1
@@ -1236,6 +1268,8 @@ def scan_email_account(
                             valuation=valuation,
                         )
                     )
+                if not shadow and not read_only_mailbox:
+                    mark_email_seen(mail, msg_id, strict=strict)
                 continue
 
             city_deals = [deal for deal in parsed_deals if deal.city.lower() == city.lower()]
@@ -1278,6 +1312,8 @@ def scan_email_account(
                     notify=not screening_enabled,
                 )
             )
+            if not shadow and not read_only_mailbox:
+                mark_email_seen(mail, msg_id, strict=strict)
         return results
     finally:
         if shadow:
