@@ -10,6 +10,7 @@ This project includes a Python program (`monitor.py`) that:
 - Extracts ask, rehab, sqft, beds/baths, year built, and risk flags.
 - Calculates a configurable first-pass profit, basis percentage, MAO, and lead score.
 - Deduplicates structured deals by normalized address and ask across mailboxes/senders.
+- Marks successfully parsed live Gmail and Zoho messages read; shadow scans never change mailbox flags.
 
 ## Pre-screening engine
 
