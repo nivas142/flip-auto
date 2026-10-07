@@ -164,7 +164,7 @@ def build_config(template: dict[str, Any], env: Mapping[str, str]) -> dict[str, 
     settings = _settings(env)
     if _value(env, "GSHEET_SERVICE_ACCOUNT_JSON"):
         raise RuntimeConfigurationError("The live runner requires reviewed public-sheet access")
-    cfg.update({"execution_mode": "live", "strict_errors": True, "read_only_mailbox": True})
+    cfg.update({"execution_mode": "live", "strict_errors": True, "read_only_mailbox": False})
     cfg.pop("state_file", None)
     cfg["email"].update({
         "enabled": True,
