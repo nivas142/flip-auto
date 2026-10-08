@@ -5,6 +5,7 @@ import unittest
 from deal_screening import (
     extract_deal_facts,
     format_screening_result,
+    is_creative_financing,
     normalize_address_key,
     screen_deal,
 )
@@ -95,6 +96,39 @@ class DealScreeningTests(unittest.TestCase):
         self.assertEqual(result.status, "valuation_required")
         self.assertIsNone(result.score)
         self.assertIn("independent comp ARV", result.missing_fields)
+
+    def test_creative_entry_fee_is_not_treated_as_purchase_price(self):
+        facts = extract_deal_facts(
+            address="225 N Standage Unit 58, Mesa, AZ 85201",
+            city="Mesa",
+            price="$25,000",
+            summary=(
+                "3 Bed / 3 Bath 1,729 SqFt 1968 Build. "
+                "Creative: $25k entry fee; PITI $2,500/mo; 10-yr term"
+            ),
+        )
+        result = screen_deal(facts, independent_valuation(low=307_000, likely=355_000, high=486_000))
+
+        self.assertIsNone(facts.ask)
+        self.assertIn("creative financing", facts.risk_flags)
+        self.assertEqual(result.status, "creative_finance_review")
+        self.assertEqual(result.label, "🟡 CREATIVE FINANCING REVIEW")
+        self.assertIsNone(result.score)
+        self.assertIsNone(result.projected_profit)
+        self.assertIsNone(result.basis_percent)
+        self.assertIsNone(result.mao)
+        rendered = format_screening_result(result)
+        self.assertIn("Automated profit, basis percentage, and MAO are disabled", rendered)
+        self.assertIn("existing debt balance", rendered)
+
+    def test_marketing_copy_and_disclaimers_are_not_creative_financing(self):
+        for text in (
+            "Looking for fix & flips, rentals, development, and creative deals.",
+            "Terms subject to change without notice.",
+            "All properties subject to errors, omissions, deletions, and additions.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(is_creative_financing(text))
 
     def test_assumes_rehab_from_square_feet(self):
         facts = extract_deal_facts(

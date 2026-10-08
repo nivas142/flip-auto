@@ -15,6 +15,14 @@ from valuation import ValuationResult
 
 
 MONEY_TOKEN_RE = r"\$?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?\s*[kKmM]?"
+CREATIVE_FINANCE_RE = re.compile(
+    r"\b(?:creative\s+financ(?:e|ing)|sub(?:2|to)|"
+    r"subject[- ]?to(?=\s+(?:(?:the|an?)\s+)?(?:existing\s+)?"
+    r"(?:mortgage|loan|financ(?:e|ing)|debt|payments?))|"
+    r"(?:seller|owner)\s+financ(?:e|ing)|wrap(?:around)?|entry\s+fee|piti|"
+    r"take\s+over\s+(?:the\s+)?payments?)\b",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -65,6 +73,7 @@ DEFAULT_SCREENING_CONFIG: dict[str, Any] = {
 
 
 RISK_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("creative financing", CREATIVE_FINANCE_RE),
     ("occupied/eviction", re.compile(r"\b(?:occupied|eviction|post[- ]?possession|tenant)\b", re.I)),
     ("no interior access", re.compile(r"\b(?:no interior access|interior access not available|drive[- ]?by only)\b", re.I)),
     ("fire damage", re.compile(r"\b(?:fire damage|fire damaged|burn(?:ed|t))\b", re.I)),
@@ -122,6 +131,11 @@ def _labeled_money(labels: tuple[str, ...], text: str) -> int | None:
     return parse_money(match.group("amount")) if match else None
 
 
+def is_creative_financing(text: str) -> bool:
+    """Return whether advertised terms are financing cash-in, not a cash ask."""
+    return bool(CREATIVE_FINANCE_RE.search(" ".join((text or "").split())))
+
+
 def normalize_address_key(address: str) -> str:
     normalized = address.lower().replace("#", " unit ")
     normalized = re.sub(r"\b(?:street)\b", "st", normalized)
@@ -137,7 +151,11 @@ def normalize_address_key(address: str) -> str:
 
 def extract_deal_facts(*, address: str, city: str, price: str, summary: str) -> DealFacts:
     text = " ".join((summary or "").split())
-    ask = parse_money(price) or _labeled_money(("all-in price", "wholesale price", "asking price", "price"), text)
+    creative_financing = is_creative_financing(text)
+    ask = None if creative_financing else (
+        parse_money(price)
+        or _labeled_money(("all-in price", "wholesale price", "asking price", "price"), text)
+    )
     explicit_rehab = _labeled_money(("rehab", "repairs", "renovation"), text)
     sqft = _first_number(
         (
@@ -179,6 +197,30 @@ def screen_deal(
     raw_config: dict[str, Any] | None = None,
 ) -> ScreeningResult:
     config = merged_screening_config(raw_config)
+    if "creative financing" in facts.risk_flags:
+        complete_valuation = valuation is not None and valuation.status == "complete"
+        return ScreeningResult(
+            status="creative_finance_review",
+            label="🟡 CREATIVE FINANCING REVIEW",
+            score=None,
+            confidence="manual",
+            ask=None,
+            arv_low=valuation.arv_low if complete_valuation else None,
+            arv_likely=valuation.arv_likely if complete_valuation else None,
+            arv_high=valuation.arv_high if complete_valuation else None,
+            valuation_source=valuation.source if complete_valuation else "none",
+            comp_count=len(valuation.comparables) if complete_valuation else 0,
+            rehab=None,
+            rehab_is_assumed=False,
+            selling_costs=None,
+            other_costs=None,
+            projected_profit=None,
+            basis_percent=None,
+            mao=None,
+            risk_flags=facts.risk_flags,
+            missing_fields=("total purchase price and debt terms",),
+        )
+
     missing: list[str] = []
     if facts.ask is None:
         missing.append("ask")
@@ -287,6 +329,14 @@ def format_money(value: int | None) -> str:
 
 def format_screening_result(result: ScreeningResult) -> str:
     lines = [f"Screen: {result.label}"]
+    if result.status == "creative_finance_review":
+        lines.append("Automated profit, basis percentage, and MAO are disabled for creative financing.")
+        if result.risk_flags:
+            lines.append(f"Risk flags: {', '.join(result.risk_flags)}")
+        lines.append("Missing: total purchase price, existing debt balance, rate, amortization, and balloon terms")
+        lines.append("Next step: Manually underwrite the complete financing terms and verify property type with ARMLS")
+        return "\n".join(lines)
+
     if result.score is not None:
         lines.append(f"Pre-screen score: {result.score}/100 ({result.confidence} confidence)")
     if result.arv_low is not None:

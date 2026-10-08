@@ -435,6 +435,50 @@ Worth: $ 615,000
             },
         )
 
+    def test_creative_entry_fee_gets_manual_review_without_cma_request(self):
+        raw_message = build_html_email_bytes(
+            from_addr="Deals <deals@example.com>",
+            subject="New creative-finance deal",
+            html="""
+                <table><tr><td>
+                  225 N Standage Unit 58, Mesa, AZ 85201
+                  3 Bed / 3 Bath 1,729 SqFt 1968 Build
+                  Creative: $25k entry fee · PITI $2,500/mo · 10-yr term
+                  Price: $25,000
+                  <a href="https://example.com/mesa">Photos / Details</a>
+                </td></tr></table>
+            """,
+        )
+        fake_imap = FakeIMAP(raw_message)
+        account_cfg = {
+            "label": "email",
+            "imap_host": "imap.example.com",
+            "username": "user@example.com",
+            "password": "secret",
+            "folder": "INBOX",
+            "lookback_minutes": 60,
+            "sender_filters": ["deals@example.com"],
+            "subject_filters": [],
+            "cities": ["Mesa"],
+        }
+
+        with patch.object(imaplib, "IMAP4_SSL", return_value=fake_imap), patch.object(
+            monitor, "request_cloud_cma_for_deal"
+        ) as request_cma:
+            results = monitor.scan_email_account(
+                account_cfg,
+                {"enabled": True},
+                {"enabled": True, "api_key": "test"},
+            )
+
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0].notify)
+        self.assertIn("CREATIVE FINANCING REVIEW", results[0].title)
+        self.assertIn("Advertised cash-in: $25,000", results[0].body)
+        self.assertNotIn("Ask: $25,000", results[0].body)
+        self.assertNotIn("Preliminary profit", results[0].body)
+        request_cma.assert_not_called()
+
     def test_structured_deal_id_dedupes_address_variants_across_sources(self):
         first = monitor.PropertyDeal(
             city="Mesa",

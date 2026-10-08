@@ -45,6 +45,7 @@ from cloud_cma_callback import callback_delivery_url, delete_result, fetch_resul
 from deal_screening import (
     extract_deal_facts,
     format_screening_result,
+    is_creative_financing,
     normalize_address_key,
     screen_deal,
 )
@@ -1060,7 +1061,10 @@ def build_deal_alert(
         lines.append(f"Received: {received_at}")
     lines.append(f"Address: {deal.address}")
     if deal.price:
-        lines.append(f"Ask: {deal.price}")
+        if is_creative_financing(deal.summary):
+            lines.append(f"Advertised cash-in: {deal.price} (not a verified purchase price)")
+        else:
+            lines.append(f"Ask: {deal.price}")
     lines.append(format_screening_result(screening))
     if deal.details_url:
         lines.append(f"Details: {deal.details_url}")
@@ -1080,6 +1084,7 @@ def build_deal_alert(
         city=deal.city,
         notify=screening.status in {
             "candidate",
+            "creative_finance_review",
             "high_risk_review",
             "price_dependent",
         },
@@ -1221,6 +1226,19 @@ def scan_email_account(
                         continue
                     item_id = deal_item_id(deal)
                     if item_id in seen:
+                        continue
+                    if is_creative_financing(deal.summary):
+                        results.append(
+                            build_deal_alert(
+                                deal=deal,
+                                label=label,
+                                from_header=from_header,
+                                subject=subject,
+                                received_at=received_at,
+                                screening_cfg=screening_cfg,
+                                valuation=None,
+                            )
+                        )
                         continue
                     if shadow:
                         metrics = state.setdefault("last_run", {})
