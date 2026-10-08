@@ -128,7 +128,14 @@ class LiveParserRolloutTests(unittest.TestCase):
         self.assertEqual(self.apply(commands), NEW_IMAGE)
         self.assertEqual(
             commands.build_files,
-            ["Dockerfile", "cloud_cma.py", "gcp_live_runtime.py", "monitor.py", "scripts/gcp_cma_recovery_verify.py"],
+            [
+                "Dockerfile",
+                "cloud_cma.py",
+                "deal_screening.py",
+                "gcp_live_runtime.py",
+                "monitor.py",
+                "scripts/gcp_cma_recovery_verify.py",
+            ],
         )
         run = next(call for call in commands.calls if call[:2] == ("docker", "run"))
         self.assertIn("--network=none", run)

@@ -22,9 +22,10 @@ REGION = "us-central1"
 JOB = "flip-auto-live"
 SERVICE_ACCOUNT = "flip-auto-live@flip-auto.iam.gserviceaccount.com"
 REPOSITORY = "us-central1-docker.pkg.dev/flip-auto/flip-auto/monitor"
-BASE_IMAGE = REPOSITORY + "@sha256:c008cb8565a7c6d51ae706bc8aa1571dd551271044309146828d6f3d567f1f06"
+BASE_IMAGE = REPOSITORY + "@sha256:8470acdbb7e4d23ffb8eb54e6b3b6518709213a2ab200f72064257ff45b59a01"
 PARSER_SHA = "d262aae235126c60ede4599936fbb74fdbf7f9dddc884ba2054b05a646167415"
-MONITOR_SHA = "d3cb6e59bb2c2d21d1c6d8f94867e3afa0a70dc1a0a77d3acd08e549050b57b8"
+MONITOR_SHA = "e32bb693bf144d3f32f504449c6d9837c66c3e7bb5aeb2092e438af03a718d1f"
+DEAL_SCREENING_SHA = "064c2ee8d4bf3e8b023e29e00c03575c0a67e68c166bf7e74b75e30ba6377186"
 LIVE_RUNTIME_SHA = "796803982efb435801cfde4c6000a50f8c050aaafb29132f6f05ccee12dbe511"
 RECOVERY_SHA = "f42f273cc12fe6e063d0c0452b010a400a64e9ce016e2e069cd00409e0f65c2f"
 RECOVERY_TEXT_SHA = "d2a1c3ea7a48a1d40a1fa327ff5c1fdf8430503b731d248ac0f6d12c3a63e69e"
@@ -75,15 +76,16 @@ class Commands:
             raise RolloutError("Unexpected Google response") from exc
 
 
-def reviewed_files(root: Path | None = None) -> tuple[Path, Path, Path, Path]:
+def reviewed_files(root: Path | None = None) -> tuple[Path, Path, Path, Path, Path]:
     root = root or Path(__file__).resolve().parents[2]
     paths = (
         root / "cloud_cma.py",
         root / "monitor.py",
+        root / "deal_screening.py",
         root / "gcp_live_runtime.py",
         root / "scripts/gcp_cma_recovery_verify.py",
     )
-    expected = (PARSER_SHA, MONITOR_SHA, LIVE_RUNTIME_SHA, RECOVERY_SHA)
+    expected = (PARSER_SHA, MONITOR_SHA, DEAL_SCREENING_SHA, LIVE_RUNTIME_SHA, RECOVERY_SHA)
     for path, digest in zip(paths, expected):
         if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
             raise RolloutError("Reviewed parser recovery source is missing or changed")
@@ -193,7 +195,7 @@ def apply(
     commands: Commands | None = None,
     output: object | None = None,
 ) -> str:
-    parser, monitor, live_runtime, verifier = reviewed_files(root)
+    parser, monitor, deal_screening, live_runtime, verifier = reviewed_files(root)
     verify_recovery_text(recovery_text)
     commands = commands or Commands()
     output = output or sys.stdout
@@ -222,7 +224,7 @@ def apply(
     )
     with tempfile.TemporaryDirectory(prefix="flip-auto-live-parser-") as directory:
         context = Path(directory)
-        for source in (parser, monitor, live_runtime):
+        for source in (parser, monitor, deal_screening, live_runtime):
             shutil.copyfile(source, context / source.name)
             (context / source.name).chmod(0o644)
         (context / "scripts").mkdir()
@@ -232,6 +234,7 @@ def apply(
             f"FROM {BASE_IMAGE}\n"
             "COPY --chown=10001:10001 cloud_cma.py /app/cloud_cma.py\n"
             "COPY --chown=10001:10001 monitor.py /app/monitor.py\n"
+            "COPY --chown=10001:10001 deal_screening.py /app/deal_screening.py\n"
             "COPY --chown=10001:10001 gcp_live_runtime.py /app/gcp_live_runtime.py\n"
             "COPY --chown=10001:10001 scripts/gcp_cma_recovery_verify.py "
             "/app/scripts/gcp_cma_recovery_verify.py\n",
