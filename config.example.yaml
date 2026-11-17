@@ -28,7 +28,7 @@ email:
   subject_filters: []
   sender_subject_filters:
     listingupdates@flexmail.flexmls.com:
-      - Copy: Subscription Investing
+      - "Copy: Subscription Investing"
   cities:
     - Chandler
     - Gilbert
