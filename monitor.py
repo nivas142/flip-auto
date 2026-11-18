@@ -18,13 +18,14 @@ import re
 import sys
 import csv
 import io
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email import message_from_bytes
 from email.header import decode_header, make_header
 from email.message import Message
-from email.utils import parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -75,6 +76,7 @@ class AlertItem:
     body: str
     city: str
     notify: bool = True
+    metrics_source: str = "other"
 
 
 @dataclass
@@ -85,6 +87,7 @@ class PropertyDeal:
     details_url: str
     image_url: str
     summary: str
+    mls_number: str = ""
 
 
 ADDRESS_RE = re.compile(
@@ -111,6 +114,26 @@ PLAIN_PRICE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 URL_RE = re.compile(r"https?://[^\s\])>]+", flags=re.IGNORECASE)
+
+FLEXMLS_SENDER = "listingupdates@flexmail.flexmls.com"
+FLEXMLS_STREET_PATTERN = r"[0-9]{1,6}[ \t]+\S[^\r\n]*"
+FLEXMLS_LOCALITY_PATTERN = (
+    r"(?P<locality>(?P<city>[A-Za-z][A-Za-z .'-]*),[ \t]*[A-Z]{2}"
+    r"[ \t]+[0-9]{5}(?:-[0-9]{4})?)"
+)
+FLEXMLS_HTML_LOCATION_RE = re.compile(
+    rf"{FLEXMLS_LOCALITY_PATTERN}\s*\u2022\s*(?:MLS\s*)?#\s*(?P<mls_number>[0-9]+)",
+    flags=re.IGNORECASE,
+)
+FLEXMLS_TEXT_CARD_RE = re.compile(
+    rf"^[ \t]*(?P<price>{ASK_MONEY_RE})[ \t]*\r?\n"
+    rf"[ \t]*(?P<street>{FLEXMLS_STREET_PATTERN}),[ \t]*{FLEXMLS_LOCALITY_PATTERN}[ \t]*\r?\n"
+    r"[ \t]*[^\r\n]+?[ \t]+-[ \t]+MLS[ \t]*#[ \t]*(?P<mls_number>[0-9]+)[ \t]*(?=\r?$)"
+    r"(?:\s+Follow this link to view the listing in flexmls:[ \t]*(?P<link>https?://[^\s<>]+))?",
+    flags=re.MULTILINE | re.IGNORECASE,
+)
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
@@ -246,6 +269,9 @@ FOOTER_CITY_SENDER_ALIASES = {
 def detect_email_city(msg: Message, from_header: str, subject: str, body: str, cities: list[str]) -> tuple[str | None, list["PropertyDeal"]]:
     parsed_deals = extract_property_deals_from_email(msg, cities)
     sender = from_header.lower()
+
+    if parseaddr(msg.get("From", ""))[1].casefold() == FLEXMLS_SENDER:
+        return (parsed_deals[0].city if parsed_deals else None), parsed_deals
 
     # Some marketing emails include city names in footers or physical mailing
     # addresses; restrict those senders to subject and extracted deal data.
@@ -443,7 +469,59 @@ def _deal_container_for_link(link: Any, cities: list[str]) -> tuple[Any, str, st
     return None
 
 
+def extract_flexmls_deals(msg: Message, cities: list[str]) -> list[PropertyDeal]:
+    allowed_cities = {normalize_text(city).casefold(): city for city in cities}
+    deals: dict[str, PropertyDeal] = {}
+
+    def add_card(price: str, street: str, location: re.Match[str], link: str) -> None:
+        city = allowed_cities.get(normalize_text(location["city"]).casefold())
+        if not city or not _is_plausible_ask_amount(price):
+            return
+        mls_number = location["mls_number"]
+        deals.setdefault(
+            mls_number,
+            PropertyDeal(
+                city=city,
+                address=f'{street}, {location["locality"]}',
+                price=price,
+                details_url=link if URL_RE.fullmatch(link) else "",
+                image_url="",
+                summary="",
+                mls_number=mls_number,
+            ),
+        )
+
+    html = decode_email_part(msg, "text/html")
+    if html:
+        soup = BeautifulSoup(html, "html.parser")
+        # Each listing's price, street link and city/MLS number share one cell.
+        for cell in soup.select("tr > td"):
+            fields = cell.find_all("div", recursive=False)
+            for price_field, street_field, location_field in zip(fields, fields[1:], fields[2:]):
+                location = FLEXMLS_HTML_LOCATION_RE.fullmatch(
+                    normalize_text(location_field.get_text(" ", strip=True))
+                )
+                if not location:
+                    continue
+                price = normalize_text(price_field.get_text(" ", strip=True))
+                street = normalize_text(street_field.get_text(" ", strip=True))
+                if not re.fullmatch(FLEXMLS_STREET_PATTERN, street):
+                    continue
+                street_link = street_field.find("a", href=True)
+                link = street_link["href"].strip() if street_link else ""
+                add_card(price, street, location, link)
+
+    # Prefer HTML's listing-specific links and recover cards from the text part.
+    for card in FLEXMLS_TEXT_CARD_RE.finditer(decode_email_part(msg, "text/plain")):
+        add_card(normalize_text(card["price"]), normalize_text(card["street"]), card, card["link"] or "")
+
+    return list(deals.values())
+
+
 def extract_property_deals_from_email(msg: Message, cities: list[str]) -> list[PropertyDeal]:
+    if parseaddr(msg.get("From", ""))[1].casefold() == FLEXMLS_SENDER:
+        return extract_flexmls_deals(msg, cities)
+
     html_text = decode_email_part(msg, "text/html")
 
     if not html_text:
@@ -1061,6 +1139,8 @@ def build_deal_alert(
     lines.append(f"Address: {deal.address}")
     if deal.price:
         lines.append(f"Ask: {deal.price}")
+    if deal.mls_number:
+        lines.append(f"MLS #: {deal.mls_number}")
     lines.append(format_screening_result(screening))
     if deal.details_url:
         lines.append(f"Details: {deal.details_url}")
@@ -1148,15 +1228,25 @@ def scan_email_account(
     scanned = 0
     matched = 0
     mail = None
+    sources = state.get("last_run", {}).get("sources", {})
+    mailbox_source = {
+        "imap.gmail.com": "gmail", "imap.zoho.com": "zoho", "imappro.zoho.com": "zoho",
+    }.get(host.casefold(), "other_imap")
+    mailbox_metrics = sources.setdefault(mailbox_source, {})
+    started = time.monotonic()
+    stage = "imap_connect"
 
     try:
         mail = imaplib.IMAP4_SSL(host)
+        stage = "imap_login"
         mail.login(username, password)
+        stage = "imap_select"
         status, _ = mail.select(folder, readonly=True) if shadow or read_only_mailbox else mail.select(folder)
         if status != "OK":
             raise RuntimeError(f"Could not select folder '{folder}' for {label}")
 
         since_date = cutoff_dt.strftime("%d-%b-%Y")
+        stage = "imap_search"
         status, msg_ids = mail.search(None, f'(SINCE "{since_date}")')
         if status != "OK":
             if strict:
@@ -1165,6 +1255,7 @@ def scan_email_account(
 
         for msg_id in msg_ids[0].split():
             scanned += 1
+            stage = "imap_fetch_header"
             status, header_data = mail.fetch(msg_id, "(BODY.PEEK[HEADER])")
             if status != "OK" or not header_data:
                 if strict:
@@ -1190,6 +1281,7 @@ def scan_email_account(
             if not matches_sender_subject_filters(from_header, subject, sender_subject_filters):
                 continue
 
+            stage = "imap_fetch_body"
             status, data = mail.fetch(msg_id, "(BODY.PEEK[])")
             if status != "OK" or not data:
                 if strict:
@@ -1202,11 +1294,20 @@ def scan_email_account(
                 continue
             msg = message_from_bytes(raw)
 
+            stage = "email_parse"
+            source = "flexmls" if parseaddr(from_header)[1].casefold() == FLEXMLS_SENDER else mailbox_source
+            source_metrics = sources.setdefault(source, {})
+            parse_started = time.monotonic()
             received_at = parse_email_timestamp(msg)
             body = parse_email_body(msg)
             city, parsed_deals = detect_email_city(msg, from_header, subject, body, cities)
+            if source == "flexmls":
+                count_metric(source_metrics, "messages_parsed")
+                count_metric(source_metrics, "parse_duration_ms", elapsed_ms(parse_started))
+            count_metric(source_metrics, "listings_parsed", len(parsed_deals))
             if not city:
                 if not shadow and not read_only_mailbox:
+                    stage = "imap_mark_read"
                     mark_email_seen(mail, msg_id, strict=strict)
                 continue
 
@@ -1225,6 +1326,8 @@ def scan_email_account(
                     if shadow:
                         metrics = state.setdefault("last_run", {})
                         metrics["eligible_deals"] = metrics.get("eligible_deals", 0) + 1
+                    stage = "cma_lookup"
+                    previous_budget = request_budget[0]
                     try:
                         valuation = request_cloud_cma_for_deal(
                             deal,
@@ -1247,6 +1350,9 @@ def scan_email_account(
                         )
                         valuation = unavailable_valuation(str(exc))
 
+                    count_metric(source_metrics, "cma_requested", previous_budget - request_budget[0])
+                    if valuation.status in {"pending", "unavailable", "complete"}:
+                        count_metric(source_metrics, f"valuation_{valuation.status}")
                     # Pending requests are intentionally silent. The original
                     # deal remains unseen and will be combined with the report
                     # on the next scheduled run.
@@ -1257,18 +1363,20 @@ def scan_email_account(
                         continue
                     if shadow:
                         metrics["valuations_complete"] = metrics.get("valuations_complete", 0) + 1
-                    results.append(
-                        build_deal_alert(
-                            deal=deal,
-                            label=label,
-                            from_header=from_header,
-                            subject=subject,
-                            received_at=received_at,
-                            screening_cfg=screening_cfg,
-                            valuation=valuation,
-                        )
+                    stage = "deal_screening"
+                    alert = build_deal_alert(
+                        deal=deal,
+                        label=label,
+                        from_header=from_header,
+                        subject=subject,
+                        received_at=received_at,
+                        screening_cfg=screening_cfg,
+                        valuation=valuation,
                     )
+                    alert.metrics_source = source
+                    results.append(alert)
                 if not shadow and not read_only_mailbox:
+                    stage = "imap_mark_read"
                     mark_email_seen(mail, msg_id, strict=strict)
                 continue
 
@@ -1288,6 +1396,8 @@ def scan_email_account(
                     if deal.price:
                         headline = f"{headline} | {deal.price}"
                     lines.append(headline)
+                    if deal.mls_number:
+                        lines.append(f"MLS #: {deal.mls_number}")
                     if deal.details_url:
                         lines.append(f"Details: {deal.details_url}")
                     if deal.image_url:
@@ -1310,12 +1420,19 @@ def scan_email_account(
                     # Once pre-screening is enabled, a city-only match is not
                     # enough evidence to interrupt the user.
                     notify=not screening_enabled,
+                    metrics_source=source,
                 )
             )
             if not shadow and not read_only_mailbox:
+                stage = "imap_mark_read"
                 mark_email_seen(mail, msg_id, strict=strict)
         return results
+    except Exception:
+        mailbox_metrics["error_code"] = stage
+        raise
     finally:
+        count_metric(mailbox_metrics, "messages_scanned", scanned)
+        count_metric(mailbox_metrics, "messages_matched", matched)
         if shadow:
             metrics = state.setdefault("last_run", {})
             metrics["scanned_messages"] = metrics.get("scanned_messages", 0) + scanned
@@ -1329,6 +1446,7 @@ def scan_email_account(
                 mail.logout()
             except Exception:
                 pass
+        count_metric(mailbox_metrics, "duration_ms", elapsed_ms(started))
         log_label = "shadow-mailbox" if shadow else "live-mailbox" if strict else label
         print(
             f"[INFO] Email account {log_label} ({host}): scanned {scanned} messages, "
@@ -1374,7 +1492,7 @@ def scan_emails(
     return results
 
 
-def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
+def scan_sheet(config: dict[str, Any], *, metrics: dict[str, Any] | None = None) -> list[AlertItem]:
     sheet_cfg = config.get("gsheet", {})
     if not sheet_cfg.get("enabled", False):
         return []
@@ -1456,6 +1574,8 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
             return []
 
     results: list[AlertItem] = []
+    if metrics is not None:
+        metrics["rows_scanned"] = len(rows)
 
     for row in rows:
         city_match = detect_row_city(row, cities, city_column)
@@ -1483,6 +1603,7 @@ def scan_sheet(config: dict[str, Any]) -> list[AlertItem]:
                 # Sheet rows are ingestion/audit records, not independent
                 # completed underwriting results.
                 notify=not screening_enabled,
+                metrics_source="gsheet",
             )
         )
 
@@ -1575,17 +1696,53 @@ def send_alert(config: dict[str, Any], item: AlertItem) -> bool:
     return False
 
 
+def elapsed_ms(started: float) -> int:
+    return round((time.monotonic() - started) * 1000)
+
+
+def count_metric(metrics: dict[str, Any], name: str, count: int = 1) -> None:
+    metrics[name] = metrics.get(name, 0) + count
+
+
+@contextmanager
+def report_step_failure(summary: dict[str, Any], code: str):
+    try:
+        yield
+    except Exception:
+        summary["error_code"] = code
+        raise
+
+
 def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
     """Run with caller-owned state; shadow mode has no production side effects."""
     mode = config.get("execution_mode", "live")
     if mode not in {"live", "shadow"}:
         raise ValueError("Invalid execution_mode")
+    started = time.monotonic()
+    summary = {"mode": mode, "started_at": datetime.now(UTC).isoformat(), "sources": {}, "errors": 0}
+    state["last_run"] = summary
+    try:
+        return _run_monitor(config, state, summary)
+    except Exception:
+        count_metric(summary, "errors")
+        summary.setdefault("error_code", "monitor_setup")
+        raise
+    finally:
+        summary.update(finished_at=datetime.now(UTC).isoformat(), duration_ms=elapsed_ms(started))
+        print(json.dumps({
+            "event": "flip_auto_run_summary",
+            "severity": "ERROR" if summary["errors"] else "INFO",
+            **summary,
+        }, separators=(",", ":")))
+
+
+def _run_monitor(config: dict[str, Any], state: dict[str, Any], summary: dict[str, Any]) -> int:
+    mode = summary["mode"]
     shadow = mode == "shadow"
     strict = bool(config.get("strict_errors", False))
     effect_guard = None if shadow else config.get("_effect_guard")
     if effect_guard is not None and not strict:
         raise ValueError("A live effect guard requires strict_errors")
-    state["last_run"] = {"mode": mode, "started_at": datetime.now(UTC).isoformat()}
     seen_order = list(dict.fromkeys(state.get("seen", [])))
     seen = set(seen_order)
     max_seen = max(100, int(config.get("state_max_seen", 2000)))
@@ -1602,54 +1759,73 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
         raise ValueError("Guarded live production requires Telegram")
 
     matches: list[AlertItem] = []
-    errors = 0
     try:
         matches.extend(scan_emails(config, seen, state))
     except Exception as exc:
-        errors += 1
+        count_metric(summary, "errors")
+        summary["error_code"] = "email_scan"
         error_detail = exc.__class__.__name__ if shadow or strict else f"{exc.__class__.__name__}: {exc}"
         print(
             f"[WARN] Email scan failed ({error_detail}). {'Stopping.' if strict else 'Continuing.'}",
             file=sys.stderr,
         )
         if strict:
-            state["last_run"].update(finished_at=datetime.now(UTC).isoformat(), errors=errors)
             return 1
-    try:
-        matches.extend(scan_sheet(config))
-    except Exception as exc:
-        errors += 1
-        error_detail = exc.__class__.__name__ if shadow or strict else f"{exc.__class__.__name__}: {exc}"
-        print(
-            f"[WARN] Sheet scan failed ({error_detail}). {'Stopping.' if strict else 'Continuing.'}",
-            file=sys.stderr,
-        )
-        if strict:
-            state["last_run"].update(finished_at=datetime.now(UTC).isoformat(), errors=errors)
-            return 1
+    sources = summary["sources"]
+    if config.get("gsheet", {}).get("enabled"):
+        sheet_metrics = sources.setdefault("gsheet", {})
+        sheet_started = time.monotonic()
+        try:
+            sheet_matches = scan_sheet(config, metrics=sheet_metrics)
+            sheet_metrics["rows_matched"] = len(sheet_matches)
+            matches.extend(sheet_matches)
+        except Exception as exc:
+            count_metric(summary, "errors")
+            summary["error_code"] = "sheet_scan"
+            sheet_metrics["error_code"] = "sheet_scan"
+            error_detail = exc.__class__.__name__ if shadow or strict else f"{exc.__class__.__name__}: {exc}"
+            print(
+                f"[WARN] Sheet scan failed ({error_detail}). {'Stopping.' if strict else 'Continuing.'}",
+                file=sys.stderr,
+            )
+            if strict:
+                return 1
+        finally:
+            sheet_metrics["duration_ms"] = elapsed_ms(sheet_started)
 
     sent = 0
     suppressed = 0
     would_alert = 0
+    summary["matches"] = len(matches)
     for item in matches:
+        item_metrics = sources.setdefault(item.metrics_source, {})
         if item.item_id in seen:
+            count_metric(item_metrics, "duplicates")
             continue
 
         if item.notify:
             if shadow:
                 would_alert += 1
+                count_metric(item_metrics, "would_alert")
                 print(f"[SHADOW] Would alert: {item.title}")
             else:
                 if effect_guard is not None:
-                    effect_guard.begin("telegram_alert", item.item_id, state)
+                    with report_step_failure(summary, "effect_begin"):
+                        effect_guard.begin("telegram_alert", item.item_id, state)
+                delivery_started = time.monotonic()
                 try:
                     delivered = send_alert(config, item)
                     if strict and not delivered:
                         raise RuntimeError("Alert delivery was not confirmed")
                 except Exception as exc:
+                    summary["error_code"] = "alert_delivery"
                     if strict:
                         raise RuntimeError(f"Alert delivery failed ({type(exc).__name__})") from None
                     raise
+                finally:
+                    count_metric(item_metrics, "alert_duration_ms", elapsed_ms(delivery_started))
+                if delivered:
+                    count_metric(item_metrics, "alerts_sent")
                 if not delivered:
                     print(f"[DRY RUN] {item.title}\n{item.body}\n")
             if not shadow:
@@ -1657,30 +1833,29 @@ def run_monitor(config: dict[str, Any], state: dict[str, Any]) -> int:
         else:
             print(f"[SUPPRESSED] {item.title}")
             suppressed += 1
+            count_metric(item_metrics, "suppressed")
 
         seen.add(item.item_id)
         seen_order.append(item.item_id)
         state["seen"] = seen_order[-max_seen:]
         if effect_guard is not None:
-            if item.notify:
-                effect_guard.complete(state)
-            else:
-                effect_guard.checkpoint(state)
+            with report_step_failure(summary, "effect_checkpoint"):
+                if item.notify:
+                    effect_guard.complete(state)
+                else:
+                    effect_guard.checkpoint(state)
 
     # Keep state bounded.
     state["seen"] = seen_order[-max_seen:]
-    state["last_run"].update(
-        finished_at=datetime.now(UTC).isoformat(), matches=len(matches),
-        sent=sent, suppressed=suppressed, would_alert=would_alert, errors=errors,
-    )
+    summary.update(sent=sent, suppressed=suppressed, would_alert=would_alert)
 
     print(
         f"Processed {len(matches)} matches, sent {sent} new alerts, "
         f"suppressed {suppressed}."
     )
     if shadow:
-        print(f"[SHADOW] Would alert {would_alert}; scan errors {errors}.")
-    return 1 if (shadow or strict) and errors else 0
+        print(f"[SHADOW] Would alert {would_alert}; scan errors {summary['errors']}.")
+    return 1 if (shadow or strict) and summary["errors"] else 0
 
 
 def main() -> int:

@@ -172,6 +172,55 @@ class LiveEffectsTests(unittest.TestCase):
         sheet.assert_not_called()
         send.assert_not_called()
 
+    def test_run_summary_attributes_flexmls_and_sheet_counts_without_private_data(self):
+        raw = build_email_bytes(
+            from_addr=monitor.FLEXMLS_SENDER, subject="Copy: Subscription Investing",
+            body="$300,000.00\n123 Private St, Mesa, AZ 85201\nActive - MLS #1000001\n",
+        )
+        config = {
+            **self.config,
+            "email": {"enabled": True, "imap_host": "imap.gmail.com", "username": "PRIVATE USER",
+                      "password": "PRIVATE PASSWORD", "cities": ["Mesa"]},
+            "gsheet": {"enabled": True, "cities": ["Mesa"]},
+            "screening": {"enabled": True},
+            "valuation": {"enabled": True},
+        }
+        state = {}
+        with patch.object(monitor.imaplib, "IMAP4_SSL", return_value=ReadOnlyIMAP(raw)), \
+             patch.object(monitor, "request_cloud_cma_for_deal", return_value=monitor.pending_valuation()), \
+             patch.object(monitor, "load_public_sheet_rows", return_value=([{"city": "Mesa"}], "PRIVATE SHEET")), \
+             patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(monitor.run_monitor(config, state), 0)
+
+        summaries = [line for line in output.getvalue().splitlines() if line.startswith("{")]
+        self.assertEqual(len(summaries), 1)
+        self.assertNotIn("PRIVATE", summaries[0].upper())
+        self.assertNotIn("1000001", summaries[0])
+        summary = json.loads(summaries[0])
+        self.assertEqual(summary["event"], "flip_auto_run_summary")
+        self.assertEqual(summary["sources"], state["last_run"]["sources"])
+        self.assertEqual(summary["sources"]["gmail"]["messages_scanned"], 1)
+        self.assertEqual(summary["sources"]["flexmls"]["listings_parsed"], 1)
+        self.assertEqual(summary["sources"]["flexmls"]["valuation_pending"], 1)
+        self.assertEqual(summary["sources"]["gsheet"]["rows_scanned"], 1)
+        self.assertEqual(summary["sources"]["gsheet"]["suppressed"], 1)
+        self.assertGreaterEqual(summary["duration_ms"], 0)
+
+    def test_failed_mailbox_reports_safe_stage_and_partial_counts(self):
+        config = {**self.config, "email": {"enabled": True, "imap_host": "imap.gmail.com",
+                                           "username": "PRIVATE USER", "password": "PRIVATE PASSWORD"}}
+        mail = ReadOnlyIMAP(b"")
+        mail.fetch = Mock(side_effect=RuntimeError("PRIVATE FETCH ERROR"))
+        with patch.object(monitor.imaplib, "IMAP4_SSL", return_value=mail), \
+             patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(monitor.run_monitor(config, {}), 1)
+
+        summary = json.loads(output.getvalue())
+        self.assertEqual(summary["severity"], "ERROR")
+        self.assertEqual(summary["sources"]["gmail"]["error_code"], "imap_fetch_header")
+        self.assertEqual(summary["sources"]["gmail"]["messages_scanned"], 1)
+        self.assertNotIn("PRIVATE", output.getvalue())
+
     def test_production_requires_notifier_before_scan(self):
         self.config["telegram"]["enabled"] = False
         with patch.object(monitor, "scan_emails") as scan, self.assertRaisesRegex(ValueError, "notifier"):

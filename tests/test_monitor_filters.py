@@ -607,7 +607,12 @@ Worth: $ 615,000
         raw_message = build_email_bytes(
             from_addr="Listing Updates <listingupdates@flexmail.flexmls.com>",
             subject="Copy: Subscription Investing",
-            body="Chandler deal details inside.",
+            body=(
+                "$334,900.00\n"
+                "101 Example Drive, Chandler, AZ 85226\n"
+                "Active - MLS #1000001\n\n"
+                "Follow this link to view the listing in flexmls: https://www.flexmls.com/share/chandler\n"
+            ),
         )
         fake_imap = FakeIMAP(raw_message)
 
@@ -633,8 +638,59 @@ Worth: $ 615,000
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].city, "Chandler")
         self.assertEqual(results[0].title, "Email match: Chandler")
+        self.assertIn("101 Example Drive, Chandler, AZ 85226 | $334,900.00", results[0].body)
+        self.assertIn("MLS #: 1000001", results[0].body)
+        self.assertIn("https://www.flexmls.com/share/chandler", results[0].body)
         self.assertIn(("store", ("1", "+FLAGS", "\\Seen")), fake_imap.calls)
         self.assertIn("Email account email (imap.example.com): scanned 1 messages, matched 1.", stderr.getvalue())
+
+    def test_flexmls_html_keeps_each_listing_price_and_link_with_its_address(self):
+        rows = [
+            ("$399,999", "101 Example Ave", "Mesa, AZ 85212", "1000001"),
+            ("$440,000", "201 Example Dr", "Tempe, AZ 85282", "1000002"),
+            ("$390,000", "301 Example St", "Gilbert, AZ 85295", "1000003"),
+        ]
+        cards = "".join(
+            f"""<tr><td><img alt="Listing Update"></td><td>
+                <div><a href="https://www.flexmls.com/share/{mls}"><img alt="">{price}</a></div>
+                <div><a href="https://www.flexmls.com/share/{mls}">{street}</a></div>
+                <div>{locality} &bull; #{mls}</div><div><span>Active</span></div>
+                </td></tr>"""
+            for price, street, locality, mls in rows
+        )
+        raw_message = build_html_email_bytes(
+            from_addr="Listing Updates <listingupdates@flexmail.flexmls.com>",
+            subject="Copy: Subscription Investing",
+            html=f"<table>{cards}</table><p>201 Brokerage Rd, Chandler, AZ 85286</p>",
+        )
+        msg = monitor.message_from_bytes(raw_message)
+        city, deals = monitor.detect_email_city(
+            msg, msg["From"], msg["Subject"], monitor.parse_email_body(msg), ["Chandler", "Mesa", "Gilbert"],
+        )
+
+        self.assertEqual(city, "Mesa")
+        self.assertEqual(
+            [(d.address, d.price, d.mls_number, d.details_url) for d in deals],
+            [
+                ("101 Example Ave, Mesa, AZ 85212", "$399,999", "1000001", "https://www.flexmls.com/share/1000001"),
+                ("301 Example St, Gilbert, AZ 85295", "$390,000", "1000003", "https://www.flexmls.com/share/1000003"),
+            ],
+        )
+
+    def test_flexmls_ignores_footer_city_when_listing_is_outside_target_cities(self):
+        raw_message = build_email_bytes(
+            from_addr="Listing Updates <listingupdates@flexmail.flexmls.com>",
+            subject="Copy: Subscription Investing",
+            body=(
+                "$399,000.00\n201 Example Place, Tempe, AZ 85281\nActive - MLS #1000001\n\n"
+                "Brokerage\n201 Brokerage Rd, Chandler, AZ 85286\n"
+            ),
+        )
+        msg = monitor.message_from_bytes(raw_message)
+        self.assertEqual(
+            monitor.detect_email_city(msg, msg["From"], msg["Subject"], monitor.parse_email_body(msg), ["Chandler"]),
+            (None, []),
+        )
 
     def test_strict_read_flag_failure_stops_after_successful_parse(self):
         raw_message = build_email_bytes(

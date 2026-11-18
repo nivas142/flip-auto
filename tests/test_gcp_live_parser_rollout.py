@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import io
 import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,7 +102,7 @@ class FakeCommands:
         if args[:2] == ("docker", "build"):
             context = Path(args[-1])
             self.build_files = sorted(
-                str(path.relative_to(context)) for path in context.rglob("*") if path.is_file()
+                path.relative_to(context).as_posix() for path in context.rglob("*") if path.is_file()
             )
             self.dockerfile = (context / "Dockerfile").read_text(encoding="utf-8")
         elif args[:2] == ("docker", "run"):
@@ -118,10 +120,10 @@ class LiveParserRolloutTests(unittest.TestCase):
         self.recovery.write_bytes(b"fixture")
 
     def apply(self, commands):
-        original_verify = rollout.verify_recovery_text
-        rollout.verify_recovery_text = lambda _path: None
-        self.addCleanup(setattr, rollout, "verify_recovery_text", original_verify)
-        return rollout.apply(self.recovery, root=ROOT, commands=commands, output=io.StringIO())
+        # The production rollout pins a historical monitor. Use the test checkout here.
+        monitor_sha = hashlib.sha256((ROOT / "monitor.py").read_bytes()).hexdigest()
+        with patch.object(rollout, "MONITOR_SHA", monitor_sha), patch.object(rollout, "verify_recovery_text"):
+            return rollout.apply(self.recovery, root=ROOT, commands=commands, output=io.StringIO())
 
     def test_verified_image_only_update_keeps_scheduler_paused(self):
         commands = FakeCommands()
